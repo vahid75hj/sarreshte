@@ -1,6 +1,7 @@
 <!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ثبت سفارش · سررشته</title><link rel="icon" type="image/png" href="favicon.png"><link rel="apple-touch-icon" href="apple-touch-icon.png"><link rel="stylesheet" href="style.css"></head><body><main>
 <header class="top"><div class="logo">ن</div><div><h1 id="shop">…</h1><p class="sub">ثبت سفارش آنلاین · بدون نیاز به دایرکت</p></div></header>
 <div class="stepper"><div class="st on" id="s1"><i>۱</i>سفارش</div><div class="bar"></div><div class="st" id="s2"><i>۲</i>پرداخت</div><div class="bar"></div><div class="st" id="s3"><i>۳</i>پیگیری</div></div>
+<div id="resume"></div>
 <section id="step1">
  <div class="card"><label for="mobile">شماره موبایل</label><input id="mobile" inputmode="tel" placeholder="09xxxxxxxxx" dir="ltr" style="text-align:right">
   <div id="welcome" class="note pos" style="display:none;margin-top:12px"></div></div>
@@ -12,6 +13,8 @@
  <div class="bar-bottom"><div class="in"><div class="tot"><small>جمع کل</small><b id="total">۰ تومان</b></div><button id="submit">ادامه و پرداخت</button></div></div>
 </section>
 <section id="step2" style="display:none">
+ <div class="card"><div class="muted">سفارشت ثبت شد ✓ کد پیگیری: <b id="code0"></b> · وضعیت: منتظر واریز</div><div class="muted" style="font-size:12px;margin-top:4px">این لینک را نگه دار؛ هر وقت خواستی پرداخت را از همین‌جا ادامه بده یا وضعیت را ببین.</div>
+  <div class="row" style="padding:8px 0 0;gap:8px"><span class="track-code" id="tlink" style="font-size:12px;direction:ltr;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1"></span><button class="copy" id="cpl">کپی لینک</button></div></div>
  <div class="card"><div class="muted">مبلغ قابل پرداخت · سفارش <b id="code"></b></div><div class="amount" id="amt"></div>
   <div class="bankcard"><div class="row2"><small>کارت به کارت به</small><button class="copy" id="cp">کپی شماره</button></div><div class="no" id="cardno"></div><small id="owner"></small></div></div>
  <div class="card"><label for="ref">شماره پیگیری واریز یا ۴ رقم آخر کارت</label><input id="ref" inputmode="numeric">
@@ -32,18 +35,31 @@ function repeat() { qty = {}; last.forEach(i => qty[i.productId] = i.qty); rende
 api('/api/public/' + slug).then(s => { shop = s; $('#shop').textContent = s.name; document.title = 'سفارش از ' + s.name; render(); boot(); }).catch(e => $('#shop').textContent = e.message);
 $('#mobile').addEventListener('input', async e => {
   const m = e.target.value.replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)); if (m.replace(/\D/g, '').length < 11) return;
-  const r = await api(`/api/public/${slug}/lookup?mobile=${m}`); if (!r.found) return;
+  checkOpen(m); const r = await api(`/api/public/${slug}/lookup?mobile=${m}`); if (!r.found) return;
   $('#name').value = r.name; $('#address').value = r.address; if (r.instagram) $('#ig').value = '@' + r.instagram; last = r.lastItems;
   $('#welcome').style.display = 'block';
   $('#welcome').innerHTML = `<div>خوش برگشتی <b>${r.name}</b>! آدرست پر شد.</div>` + (last.length ? `<button class="ghost" onclick="repeat()">↻ همون سفارش قبلی: ${last.map(i => fa(i.qty) + ' ' + i.name).join('، ')}</button>` : '');
 });
 $('#submit').onclick = async () => { $('#err1').textContent = '';
   try { order = await api(`/api/public/${slug}/orders`, { method: 'POST', body: { mobile: $('#mobile').value, name: $('#name').value, address: $('#address').value, instagram: $('#ig').value, note: $('#note').value, items: Object.entries(qty).map(([productId, q]) => ({ productId, qty: q })) } });
-    $('#step1').style.display = 'none'; $('#step2').style.display = 'block'; $('#s1').className = 'st done'; $('#s1 i').textContent = '✓'; $('#s2').className = 'st on'; scrollTo(0, 0);
-    $('#code').textContent = order.code; $('#amt').textContent = toman(order.total); $('#cardno').textContent = shop.card; $('#owner').textContent = 'به نام ' + shop.cardOwner;
+    addMine(order.code); showPay();
   } catch (e) { $('#err1').textContent = e.message; } };
+function showPay() { $('#resume').innerHTML = ''; $('#step1').style.display = 'none'; $('#step2').style.display = 'block'; $('#s1').className = 'st done'; $('#s1 i').textContent = '✓'; $('#s2').className = 'st on'; scrollTo(0, 0);
+  $('#code').textContent = order.code; $('#code0').textContent = order.code; $('#tlink').textContent = trackUrl(order.code); $('#cpl').onclick = e => copyText(trackUrl(order.code), e.target);
+  $('#amt').textContent = toman(order.total); $('#cardno').textContent = shop.card; $('#owner').textContent = 'به نام ' + shop.cardOwner; }
+async function resumePay(c) { order = await api('/api/public/orders/' + c); showPay(); }
+async function checkOpen(mobile) {
+  const l = await api(`/api/public/${slug}/open?codes=${myOrders().join(',')}&mobile=${mobile || ''}`); if (!l.length) return;
+  const th = _t ? '&theme=' + _t : '';
+  $('#resume').innerHTML = l.slice(0, 2).map(o => o.status === 'pending_payment'
+    ? `<div class="card" style="border-color:var(--text)"><div style="font-weight:800">یه سفارش منتظر پرداخت داری (کد ${o.code})</div><div class="muted" style="margin:4px 0 12px">${o.items.map(i => fa(i.qty) + ' ' + i.name).join('، ')} · ${toman(o.total)}</div>
+       <div class="stack" style="display:grid;gap:8px"><button onclick="resumePay('${o.code}')">ادامهٔ پرداخت</button><button class="ghost" onclick="$('#resume').innerHTML='';$('#mobile').focus()">ثبت سفارش جدید</button></div></div>`
+    : `<div class="card"><div style="font-weight:800">رسید سفارش ${o.code} ارسال شده؛ منتظر تأیید فروشنده</div><div class="muted" style="margin:4px 0 12px">${toman(o.total)}</div>
+       <div style="display:grid;gap:8px"><a href="track.html?c=${o.code}${th}" style="text-decoration:none"><button>پیگیری سفارش</button></a><button class="ghost" onclick="$('#resume').innerHTML=''">ثبت سفارش جدید</button></div></div>`).join(''); }
 // Demo params: ?mobile=09.. prefills + looks up; ?step=pay auto-fills a sample order and jumps to payment
 async function boot() { const q = new URLSearchParams(location.search), m = q.get('mobile'), st = q.get('step');
+  if (q.get('pay')) { await resumePay(q.get('pay')).catch(e => $('#err1').textContent = e.message); return; }
+  checkOpen(m);
   if (st === 'pay') { $('#mobile').value = m || '09122222222'; $('#mobile').dispatchEvent(new Event('input')); await new Promise(r => setTimeout(r, 50));
     if (!$('#name').value) { $('#name').value = 'مشتری نمونه'; $('#address').value = 'تهران، خیابان نمونه، پلاک ۱'; }
     if (last.length) repeat(); else { qty = { [shop.products[0].id]: 1 }; render(); } $('#submit').click(); return; }

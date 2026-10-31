@@ -3,6 +3,16 @@ const _t = new URLSearchParams(location.search).get('theme'); if (_t) document.d
 const _q = new URLSearchParams(location.search);
 if (_q.get('reset') === '1') localStorage.removeItem('noora-demo-db'); // ?reset=1 → fresh seed data
 if (!/index\.html$|\/$/.test(location.pathname)) addEventListener('DOMContentLoaded', () => { const a = document.createElement('a'); a.href = 'index.html' + (_t ? '?theme=' + _t : ''); a.className = 'back-hub'; a.textContent = '← بازگشت به صفحه تست'; document.querySelector('main').prepend(a); });
+// Orders placed from this device (demo "session"): ?mine=CODE marks a seeded order as this device's.
+const MINE = 'sarreshte-my-orders';
+const myOrders = () => JSON.parse(localStorage.getItem(MINE) || '[]');
+const addMine = c => { const l = myOrders().filter(x => x !== c); l.push(c); localStorage.setItem(MINE, JSON.stringify(l)); };
+if (_q.get('reset') === '1') localStorage.removeItem(MINE);
+if (_q.get('mine')) addMine(_q.get('mine'));
+function copyText(t,b){const done=()=>{if(!b)return;const o=b.textContent;b.textContent='کپی شد ✓';setTimeout(()=>b.textContent=o,1500)};
+ const fb=()=>{const a=document.createElement('textarea');a.value=t;a.setAttribute('readonly','');a.style.position='fixed';a.style.opacity='0';document.body.appendChild(a);a.select();a.setSelectionRange(0,99999);try{document.execCommand('copy')}catch(e){}document.body.removeChild(a);done()};
+ if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t).then(done,fb)}else fb()}
+const trackUrl = c => new URL('track.html?c=' + c, location.href).href;
 const fa = n => Number(n).toLocaleString('fa-IR');
 const toman = n => fa(n) + ' تومان';
 const $ = s => document.querySelector(s);
@@ -28,6 +38,9 @@ const routes = [
     const r = +b.rating; if (!(r >= 1 && r <= 5)) throw 'لطفاً امتیاز بدهید'; o.review = { rating: r, comment: b.comment || '', private: r <= 3, at: new Date().toISOString() };
     const sl = d.sellers.find(x => x.slug === o.seller); return { ...o, shopInstagram: sl && sl.instagram }; }],
   [/^\/api\/public\/orders\/(\w+)$/, (d, [c]) => { const o = d.orders.find(x => x.code === c); if (!o) throw 'سفارش پیدا نشد'; return o; }],
+  [/^\/api\/public\/(\w+)\/open\?codes=([^&]*)&mobile=(.*)$/, (d, [s, codes, m]) => { const cs = codes.split(',').filter(Boolean), mob = normMobile(m);
+    return d.orders.filter(o => o.seller === s && ['pending_payment', 'awaiting_confirm'].includes(o.status) && (cs.includes(o.code) || (mob.length === 11 && o.mobile === mob)))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }],
   [/^\/api\/public\/(\w+)\/lookup\?mobile=(.*)$/, (d, [s, m]) => { const c = d.customers.find(x => x.seller === s && x.mobile === normMobile(m)); if (!c) return { found: false };
     const last = d.orders.filter(o => o.customerId === c.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
     return { found: true, name: c.name, address: c.address, instagram: c.instagram || '', lastItems: last ? last.items : [] }; }],

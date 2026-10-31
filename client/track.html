@@ -3,9 +3,6 @@
 <div id="box"><div class="card">در حال بارگذاری…</div></div>
 <p class="muted" style="text-align:center;margin-top:16px">این لینک را نگه دارید؛ دیگر لازم نیست برای پرسیدن وضعیت سفارش پیام بدهید.</p>
 <script src="seed.js"></script><script src="common.js"></script><script>
-function copyText(t,b){const done=()=>{const o=b.textContent;b.textContent='کپی شد ✓';setTimeout(()=>b.textContent=o,1500)};
- const fb=()=>{const a=document.createElement('textarea');a.value=t;a.setAttribute('readonly','');a.style.position='fixed';a.style.opacity='0';document.body.appendChild(a);a.select();a.setSelectionRange(0,99999);try{document.execCommand('copy')}catch(e){}document.body.removeChild(a);done()};
- if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t).then(done,fb)}else fb()}
 const code = new URLSearchParams(location.search).get("c");
 const label = { pending_payment: 'منتظر پرداخت', awaiting_confirm: 'منتظر تأیید واریز', paid: 'پرداخت تأیید شد', shipped: 'ارسال شد', delivered: 'تحویل شد · تکمیل شده', cancelled: 'لغو شد' };
 function load() { api('/api/public/orders/' + code).then(o => {
@@ -23,6 +20,7 @@ function load() { api('/api/public/orders/' + code).then(o => {
    ${o.status === 'cancelled' ? '<div class="note" style="color:var(--neg);margin-bottom:12px">این سفارش لغو شده است.</div>' : `
    <div class="card"><ul class="tl">${steps.map(([t, d, done], i) => `<li class="${done ? 'done' : i === cur ? 'cur' : ''}"><span class="dot">${done ? '✓' : fa(i + 1)}</span><div class="t">${t}</div><div class="d">${d}</div></li>`).join('')}</ul></div>`}
    ${o.postalCode ? `<div class="card"><div class="muted">کد رهگیری پست</div><div class="row" style="padding:4px 0 0"><span class="track-code">${o.postalCode}</span><button class="copy" onclick="copyText('${o.postalCode}',this)">کپی کد</button><a href="https://tracking.post.ir/?id=${o.postalCode}" target="_blank">پیگیری در سایت پست ←</a></div></div>` : ''}
+   ${o.status === 'pending_payment' ? `<div class="card"><div class="muted" style="margin-bottom:10px">هنوز واریزی برای این سفارش ثبت نشده (${toman(o.total)}).</div><a href="order.html?s=${o.seller}&pay=${o.code}${_t ? '&theme=' + _t : ''}" style="text-decoration:none"><button>پرداخت و ارسال رسید</button></a></div>` : ''}
    ${o.status === 'shipped' ? `<div class="card"><button id="got" onclick="gotIt()">سفارش به دستم رسید ✓</button></div>` : ''}
    ${o.status === 'delivered' ? reviewBox(o) : ''}
    <div class="card"><div class="muted">لینک پیگیری این سفارش</div><div class="row" style="padding:6px 0 0;gap:8px"><span class="track-code" style="font-size:12px;direction:ltr;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${location.href}</span><button class="copy" onclick="copyText(location.href,this)">کپی لینک</button></div></div>

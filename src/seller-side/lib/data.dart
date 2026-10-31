@@ -37,11 +37,11 @@ class Store {
   static final Store I = Store._(); Store._();
   List<Product> products = []; List<Order> orders = []; Set<String> sent = {};
   Future<void> load() async {
-    final p = await SharedPreferences.getInstance(); final s = p.getString('demo2');
+    final p = await SharedPreferences.getInstance(); final s = p.getString('demo3');
     if (s == null) { seed(); await save(); return; }
     final j = jsonDecode(s); products = (j['products'] as List).map((e) => Product.fromJson(e)).toList(); orders = (j['orders'] as List).map((e) => Order.fromJson(e)).toList(); sent = ((j['sent'] ?? []) as List).cast<String>().toSet();
   }
-  Future<void> save() async => (await SharedPreferences.getInstance()).setString('demo2', jsonEncode({'products': products, 'orders': orders, 'sent': sent.toList()}));
+  Future<void> save() async => (await SharedPreferences.getInstance()).setString('demo3', jsonEncode({'products': products, 'orders': orders, 'sent': sent.toList()}));
   Future<void> reset() async { seed(); await save(); }
   void seed() { sent = {};
     products = [Product(1, 'شمع لیوانی کوچک', 180000), Product(2, 'شمع لیوانی بزرگ', 420000), Product(3, 'شمع گل‌سنگی', 250000), Product(4, 'پک هدیه سه‌تایی', 690000)];
@@ -49,7 +49,7 @@ class Store {
       ['الهام موسوی', '09124444444', 'مشهد، سجاد، بلوار جامی', 'elham.mousavi'], ['زهرا نوری', '09125555555', 'کرج، گوهردشت، فاز ۲', 'zahra.noori']];
     const reviews = {10: [5, 'بوی شمع فوق‌العاده بود، بسته‌بندی هم خیلی شیک 🌸'], 11: [4, 'خوب بود، فقط ارسال یک روز دیر رسید'], 12: [2, 'یکی از شمع‌ها ترک داشت و فتیله‌اش کج بود']};
     const spec = [[0, 2, 1, 'shipped', 45], [1, 1, 2, 'shipped', 40], [2, 4, 1, 'shipped', 35], [0, 2, 1, 'shipped', 10], [3, 3, 1, 'paid', 3], [4, 1, 3, 'paid', 2],
-      [3, 2, 2, 'awaiting_confirm', 1], [4, 3, 1, 'awaiting_confirm', 1], [3, 1, 1, 'pending_payment', 0], [4, 4, 1, 'pending_payment', 0], [1, 2, 1, 'delivered', 50], [2, 3, 1, 'delivered', 55], [4, 1, 2, 'delivered', 20]];
+      [3, 2, 2, 'awaiting_confirm', 1], [4, 3, 1, 'awaiting_confirm', 1], [3, 1, 1, 'pending_payment', 2], [4, 4, 1, 'pending_payment', 0], [1, 2, 1, 'delivered', 50], [2, 3, 1, 'delivered', 55], [4, 1, 2, 'delivered', 20]];
     orders = [for (var i = 0; i < spec.length; i++) () { final s = spec[i]; final cu = c[s[0] as int]; final p = products[(s[1] as int) - 1]; final st = s[3] as String;
       final rv = reviews[i];
       return Order(id: i + 1, code: 'NR${1000 + i}', name: cu[0], mobile: cu[1], address: cu[2], instagram: cu[3], rating: rv == null ? 0 : rv[0] as int, comment: rv == null ? '' : rv[1] as String, status: st, payRef: st == 'pending_payment' ? '' : '${4000 + i * 7}',
@@ -63,6 +63,7 @@ class Store {
   }
   List<CustomerStat> reorderDue() => customers().where((c) => c.daysSince >= 30 && c.daysSince <= 60).toList();
   Future<void> markSent(String mobile, bool v) async { v ? sent.add(mobile) : sent.remove(mobile); await save(); }
+  String payReminder(Order o) => 'سلام ${o.name} عزیز 🌸 سفارش ${o.code} (${toman(o.total)}) هنوز منتظر واریزه. اگه هنوز می‌خوایش، از این لینک پرداخت و رسید رو بفرست: ${storeLink.replaceFirst('order.html?s=noora', 'order.html?s=noora&pay=${o.code}')} — $storeName';
   String reminder(CustomerStat c) => 'سلام ${c.name} عزیز 🌸 ${fa(c.daysSince)} روز از خرید ${c.lastItems.map((i) => i.name).join('، ')} گذشته. اگه شمعت رو به آخر رسوندی، با این لینک در یک دقیقه همون سفارش قبلی رو ثبت کن: $storeLink — $storeName';
   /// Simple regex heuristic: DM text -> draft order (no LLM).
   Order parseDm(String t) {

@@ -134,16 +134,16 @@ class _HomeState extends State<Home> {
 
 class OrdersPage extends StatefulWidget { final VoidCallback onChange; const OrdersPage({super.key, required this.onChange}); @override State<OrdersPage> createState() => _OrdersState(); }
 class _OrdersState extends State<OrdersPage> {
-  static const groups = {0: ['pending_payment', 'awaiting_confirm'], 1: ['paid'], 2: ['shipped'], 3: ['delivered']};
-  static const gl = ['منتظر واریز', 'پرداخت‌شده', 'ارسال‌شده', 'تکمیل‌شده'];
+  static const groups = {0: ['awaiting_confirm'], 1: ['pending_payment'], 2: ['paid'], 3: ['shipped'], 4: ['delivered'], 5: ['cancelled']};
+  static const gl = ['منتظر تأیید واریز', 'منتظر واریز', 'پرداخت‌شده', 'ارسال‌شده', 'تکمیل‌شده', 'لغوشده'];
   int g = 0;
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
     final os = Store.I.orders.toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     int n(int i) => os.where((o) => groups[i]!.contains(o.status)).length;
-    final open = n(0) + n(1);
-    final openSum = os.where((o) => groups[0]!.contains(o.status) || o.status == 'paid').fold(0, (s, o) => s + o.total);
+    final open = n(0) + n(1) + n(2);
+    final paidList = os.where((o) => o.status == 'paid').toList(); final paidSum = paidList.fold(0, (s, o) => s + o.total);
     final toConfirm = os.where((o) => o.status == 'awaiting_confirm').length;
     final list = os.where((o) => groups[g]!.contains(o.status)).toList();
     final dark = Theme.of(context).brightness == Brightness.dark;
@@ -160,14 +160,20 @@ class _OrdersState extends State<OrdersPage> {
           Divider(color: hc.onAccent.withValues(alpha: 0.15)),
           const SizedBox(height: 12),
           Row(children: [
-            _stat(hc, 'مبلغ در جریان', toman(openSum)),
+            _stat(hc, 'منتظر واریز', fa(n(1))),
             _stat(hc, 'رسید منتظر تأیید', fa(toConfirm)),
           ]),
         ])),
       const SizedBox(height: 20),
-      SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [for (var i = 0; i < 4; i++) Padding(padding: const EdgeInsetsDirectional.only(end: 8),
+      SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [for (var i = 0; i < 6; i++) Padding(padding: const EdgeInsetsDirectional.only(end: 8),
         child: ChoiceChip(showCheckmark: false, label: Text('${gl[i]} ${fa(n(i))}'), selected: g == i, onSelected: (_) => setState(() => g = i)))])),
       const SizedBox(height: 12),
+      if (g == 2) Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: c.card, borderRadius: BorderRadius.circular(14), border: Border.all(color: c.line)),
+        child: Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('پرداخت‌شده، هنوز ارسال‌نشده', style: TextStyle(color: c.textMuted, fontSize: 12)), const SizedBox(height: 2),
+            Text('${fa(paidList.length)} سفارش', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800))])),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text('مبلغ کل', style: TextStyle(color: c.textMuted, fontSize: 12)), const SizedBox(height: 2),
+            Text(toman(paidSum), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: c.positive))])])),
       if (list.isEmpty) Padding(padding: const EdgeInsets.all(40), child: Center(child: Text('سفارشی اینجا نیست', style: TextStyle(color: c.textMuted)))),
       for (final o in list) Padding(padding: const EdgeInsets.only(bottom: 10), child: OrderCard(o, onTap: () async {
         await Navigator.push(context, MaterialPageRoute(builder: (_) => OrderPage(o))); setState(() {}); widget.onChange(); })),
@@ -198,6 +204,16 @@ class OrderCard extends StatelessWidget {
         const SizedBox(width: 12),
         Text(toman(o.total), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
       ]),
+      if (o.status == 'pending_payment' && DateTime.now().difference(o.createdAt).inHours >= 24) ...[
+        const SizedBox(height: 12),
+        Row(children: [
+          Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: c.negative.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(20), border: Border.all(color: c.negative.withValues(alpha: 0.25))),
+            child: Text('یادآوری پرداخت · ${ago(o.createdAt)}', style: TextStyle(color: c.negative, fontSize: 12, fontWeight: FontWeight.w700))),
+          const Spacer(),
+          TextButton.icon(icon: const Icon(Icons.send_rounded, size: 16), label: const Text('پیام در دایرکت'),
+            onPressed: () { copy(context, Store.I.payReminder(o)); openIg(context, o.instagram); }),
+        ]),
+      ],
     ]))));
   }
 }
