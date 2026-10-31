@@ -1,0 +1,57 @@
+<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ثبت سفارش · سررشته</title><link rel="stylesheet" href="style.css"></head><body><main>
+<header class="top"><div class="logo">ن</div><div><h1 id="shop">…</h1><p class="sub">ثبت سفارش آنلاین · بدون نیاز به دایرکت</p></div></header>
+<div class="stepper"><div class="st on" id="s1"><i>۱</i>سفارش</div><div class="bar"></div><div class="st" id="s2"><i>۲</i>پرداخت</div><div class="bar"></div><div class="st" id="s3"><i>۳</i>پیگیری</div></div>
+<section id="step1">
+ <div class="card"><label for="mobile">شماره موبایل</label><input id="mobile" inputmode="tel" placeholder="09xxxxxxxxx" dir="ltr" style="text-align:right">
+  <div id="welcome" class="note pos" style="display:none;margin-top:12px"></div></div>
+ <div class="sec">محصولات</div>
+ <div class="card" id="products" style="padding:4px 16px"></div>
+ <div class="sec">اطلاعات ارسال</div>
+ <div class="card"><label for="name">نام و نام خانوادگی</label><input id="name"><label for="address">آدرس کامل و کد پستی</label><textarea id="address" rows="3"></textarea><label for="note">توضیحات (اختیاری)</label><input id="note" placeholder="مثلاً رایحه یا رنگ دلخواه"></div>
+ <p id="err1" class="err"></p>
+ <div class="bar-bottom"><div class="in"><div class="tot"><small>جمع کل</small><b id="total">۰ تومان</b></div><button id="submit">ادامه و پرداخت</button></div></div>
+</section>
+<section id="step2" style="display:none">
+ <div class="card"><div class="muted">مبلغ قابل پرداخت · سفارش <b id="code"></b></div><div class="amount" id="amt"></div>
+  <div class="bankcard"><div class="row2"><small>کارت به کارت به</small><button class="copy" id="cp">کپی شماره</button></div><div class="no" id="cardno"></div><small id="owner"></small></div></div>
+ <div class="card"><label for="ref">شماره پیگیری واریز یا ۴ رقم آخر کارت</label><input id="ref" inputmode="numeric">
+  <label>عکس رسید (اختیاری)</label><label class="file"><input type="file" id="receipt" accept="image/*"><span>📎</span><span id="fname">انتخاب عکس رسید</span></label>
+  <p id="err2" class="err"></p><div style="margin-top:16px"><button id="paid">واریز کردم</button></div>
+  <div class="or">یا</div><button class="ghost" id="mock">پرداخت با درگاه آزمایشی <span class="badge">فقط دمو</span></button></div>
+</section>
+<script src="seed.js"></script><script src="common.js"></script><script>
+const slug = (new URLSearchParams(location.search).get("s") || "noora"); let shop, qty = {}, order, last = [];
+const icons = ['🕯️', '🫙', '🪨', '🎁'];
+function render() {
+  $('#products').innerHTML = shop.products.map((p, i) => `<div class="prod ${qty[p.id] ? 'sel' : ''}"><div class="thumb">${icons[i % 4]}</div><div class="info"><div class="name">${p.name}</div><div class="price">${toman(p.price)}</div></div><div class="qty"><button onclick="chg(${p.id},1)" aria-label="بیشتر">+</button><span>${fa(qty[p.id] || 0)}</span><button onclick="chg(${p.id},-1)" aria-label="کمتر">−</button></div></div>`).join('');
+  const t = shop.products.reduce((s, p) => s + p.price * (qty[p.id] || 0), 0);
+  $('#total').textContent = toman(t); $('#submit').disabled = !t;
+}
+function chg(id, d) { qty[id] = Math.max(0, (qty[id] || 0) + d); render(); }
+function repeat() { qty = {}; last.forEach(i => qty[i.productId] = i.qty); render(); }
+api('/api/public/' + slug).then(s => { shop = s; $('#shop').textContent = s.name; document.title = 'سفارش از ' + s.name; render(); boot(); }).catch(e => $('#shop').textContent = e.message);
+$('#mobile').addEventListener('input', async e => {
+  const m = e.target.value.replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)); if (m.replace(/\D/g, '').length < 11) return;
+  const r = await api(`/api/public/${slug}/lookup?mobile=${m}`); if (!r.found) return;
+  $('#name').value = r.name; $('#address').value = r.address; last = r.lastItems;
+  $('#welcome').style.display = 'block';
+  $('#welcome').innerHTML = `<div>خوش برگشتی <b>${r.name}</b>! آدرست پر شد.</div>` + (last.length ? `<button class="ghost" onclick="repeat()">↻ همون سفارش قبلی: ${last.map(i => fa(i.qty) + ' ' + i.name).join('، ')}</button>` : '');
+});
+$('#submit').onclick = async () => { $('#err1').textContent = '';
+  try { order = await api(`/api/public/${slug}/orders`, { method: 'POST', body: { mobile: $('#mobile').value, name: $('#name').value, address: $('#address').value, note: $('#note').value, items: Object.entries(qty).map(([productId, q]) => ({ productId, qty: q })) } });
+    $('#step1').style.display = 'none'; $('#step2').style.display = 'block'; $('#s1').className = 'st done'; $('#s1 i').textContent = '✓'; $('#s2').className = 'st on'; scrollTo(0, 0);
+    $('#code').textContent = order.code; $('#amt').textContent = toman(order.total); $('#cardno').textContent = shop.card; $('#owner').textContent = 'به نام ' + shop.cardOwner;
+  } catch (e) { $('#err1').textContent = e.message; } };
+// Demo params: ?mobile=09.. prefills + looks up; ?step=pay auto-fills a sample order and jumps to payment
+async function boot() { const q = new URLSearchParams(location.search), m = q.get('mobile'), st = q.get('step');
+  if (st === 'pay') { $('#mobile').value = m || '09122222222'; $('#mobile').dispatchEvent(new Event('input')); await new Promise(r => setTimeout(r, 50));
+    if (!$('#name').value) { $('#name').value = 'مشتری نمونه'; $('#address').value = 'تهران، خیابان نمونه، پلاک ۱'; }
+    if (last.length) repeat(); else { qty = { [shop.products[0].id]: 1 }; render(); } $('#submit').click(); return; }
+  if (m) { $('#mobile').value = m; $('#mobile').dispatchEvent(new Event('input')); } }
+$('#cp').onclick = () => { navigator.clipboard?.writeText(shop.card.replace(/-/g, '')); $('#cp').textContent = 'کپی شد'; };
+$('#receipt').onchange = e => $('#fname').textContent = e.target.files[0]?.name || 'انتخاب عکس رسید';
+const file64 = f => new Promise(r => { if (!f) return r(null); const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(f); });
+async function pay(method) { $('#err2').textContent = '';
+  try { await api(`/api/public/orders/${order.code}/pay`, { method: 'POST', body: { method, ref: $('#ref').value, receipt: await file64($('#receipt').files[0]) } }); location.href = 'track.html?c=' + order.code + (_t ? '&theme=' + _t : ''); } catch (e) { $('#err2').textContent = e.message; } }
+$('#paid').onclick = () => pay('card'); $('#mock').onclick = () => pay('mock');
+</script></main></body></html>

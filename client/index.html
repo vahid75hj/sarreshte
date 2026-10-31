@@ -1,0 +1,23 @@
+<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>سررشته · تست MVP</title><link rel="stylesheet" href="style.css"></head><body><main>
+<header class="top"><div class="logo">ن</div><div><h1>سررشته · تست MVP</h1><p class="sub">لینک سفارش و پیگیری «شمع نورا» · هر حالت را با یک کلیک ببینید</p></div></header>
+<div class="card note" style="font-size:13px;line-height:1.9">این یک نسخه‌ی نمایشی است: سرور و دیتابیس ندارد و همه‌ی داده‌ها در همین مرورگر (localStorage) ذخیره می‌شوند. هر دکمه، صفحه‌ی واقعی را با داده‌های نمونه‌ی تازه در همان حالت باز می‌کند. سمت فروشنده یک اپ Flutter جداگانه است و رمز ورودش <b><bdi>1234</bdi></b> است.</div>
+<div class="sec">حالت‌ها</div>
+<div id="list"></div>
+<div class="sec">ابزار</div>
+<div class="card stack"><button class="ghost" id="reset">بازنشانی داده‌های نمونه</button>
+<div class="links" style="text-align:center;font-size:13px">تم: <a href="?theme=light">روشن</a> · <a href="?theme=dark">تیره</a> · <a href="index.html">خودکار</a></div><p id="msg" class="muted" style="text-align:center;margin:0"></p></div>
+<script src="seed.js"></script><script src="common.js"></script><script>
+const S = [
+ ['ثبت سفارش جدید', 'فرم خالی برای مشتری تازه', 'order.html?s=noora'],
+ ['مشتری قدیمی', 'موبایل سارا کریمی وارد شده؛ نام، آدرس و «همون سفارش قبلی» خودکار می‌آید', 'order.html?s=noora&mobile=09122222222'],
+ ['مرحله پرداخت', 'سفارش پر و ثبت شده؛ صفحه‌ی کارت‌به‌کارت و رسید', 'order.html?s=noora&step=pay'],
+ ['سفارش منتظر پرداخت', 'ثبت شده ولی هنوز واریز نشده (NR1008)', 'track.html?c=NR1008'],
+ ['رسید ارسال شده', 'مشتری واریز کرده؛ منتظر تأیید فروشنده (NR1006)', 'track.html?c=NR1006'],
+ ['پرداخت تأیید شده', 'فروشنده واریز را تأیید کرده (NR1004)', 'track.html?c=NR1004'],
+ ['ارسال شده', 'با کد رهگیری پست و دکمه‌ی کپی (NR1003)', 'track.html?c=NR1003'],
+ ['سفارش لغو شده', 'سفارشی که فروشنده لغو کرده (NR1010)', 'track.html?c=NR1010'],
+];
+const th = _t ? '&theme=' + _t : '';
+$('#list').innerHTML = S.map(([t, d, u], i) => `<div class="card scn"><div class="n">${fa(i + 1)}</div><div class="b"><b>${t}</b><small>${d}</small></div><a class="go" href="${u}&reset=1${th}">باز کن</a></div>`).join('');
+$('#reset').onclick = () => { localStorage.removeItem(KEY); db(); $('#msg').textContent = 'داده‌های نمونه بازنشانی شد ✓'; };
+</script></main></body></html>
