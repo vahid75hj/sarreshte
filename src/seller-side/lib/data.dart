@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 const storeLink = 'https://vahid75hj.github.io/sarreshte/client/order.html?s=noora';
 const storeName = 'شمع نورا';
 const demoPin = '1234';
+/// Shipped orders older than this with no customer action get «پیگیری تحویل».
+const deliveryFollowUpDays = 5;
 const shopAccount = 'noora@sarreshte.app';
 const shopInstagram = 'noora.candle';
 
@@ -17,15 +19,21 @@ class Item { String name; int price; int qty; Item(this.name, this.price, this.q
   Map<String, dynamic> toJson() => {'name': name, 'price': price, 'qty': qty};
   factory Item.fromJson(Map j) => Item(j['name'], j['price'], j['qty']); }
 
-class Order { int id; String code, name, mobile, address, note, status, payRef, postalCode, instagram, comment; int rating; bool hasReceipt; DateTime createdAt; List<Item> items;
+class Order { int id; String code, name, mobile, address, note, status, payRef, postalCode, instagram, comment; int rating; bool hasReceipt, seen; DateTime createdAt; List<Item> items;
   Order({required this.id, required this.code, required this.name, required this.mobile, required this.address, this.note = '', required this.status,
-    this.payRef = '', this.postalCode = '', this.instagram = '', this.comment = '', this.rating = 0, this.hasReceipt = false, required this.createdAt, required this.items});
+    this.payRef = '', this.postalCode = '', this.instagram = '', this.comment = '', this.rating = 0, this.hasReceipt = false, this.seen = true, required this.createdAt, required this.items});
+  bool get archived => status == 'delivered' || status == 'cancelled';
+  bool get unseen => status == 'delivered' && !seen;
+  bool get followUp => status == 'shipped' && DateTime.now().difference(createdAt).inDays >= deliveryFollowUpDays;
+  bool get payReminder => status == 'pending_payment' && DateTime.now().difference(createdAt).inHours >= 24;
+  bool matches(String q) { final t = toEn(q).trim().toLowerCase().replaceAll('@', ''); if (t.isEmpty) return true;
+    return code.toLowerCase().contains(t) || name.contains(q.trim()) || mobile.contains(t) || instagram.toLowerCase().contains(t); }
   bool get privateReview => rating > 0 && rating <= 3;
   int get total => items.fold(0, (s, i) => s + i.price * i.qty);
   Map<String, dynamic> toJson() => {'id': id, 'code': code, 'name': name, 'mobile': mobile, 'address': address, 'note': note, 'status': status,
-    'payRef': payRef, 'postalCode': postalCode, 'hasReceipt': hasReceipt, 'instagram': instagram, 'rating': rating, 'comment': comment, 'createdAt': createdAt.toIso8601String(), 'items': items.map((e) => e.toJson()).toList()};
+    'payRef': payRef, 'postalCode': postalCode, 'hasReceipt': hasReceipt, 'seen': seen, 'instagram': instagram, 'rating': rating, 'comment': comment, 'createdAt': createdAt.toIso8601String(), 'items': items.map((e) => e.toJson()).toList()};
   factory Order.fromJson(Map j) => Order(id: j['id'], code: j['code'], name: j['name'], mobile: j['mobile'], address: j['address'], note: j['note'], status: j['status'],
-    payRef: j['payRef'], postalCode: j['postalCode'], hasReceipt: j['hasReceipt'], instagram: j['instagram'] ?? '', rating: j['rating'] ?? 0, comment: j['comment'] ?? '', createdAt: DateTime.parse(j['createdAt']), items: (j['items'] as List).map((e) => Item.fromJson(e)).toList()); }
+    payRef: j['payRef'], postalCode: j['postalCode'], hasReceipt: j['hasReceipt'], seen: j['seen'] ?? true, instagram: j['instagram'] ?? '', rating: j['rating'] ?? 0, comment: j['comment'] ?? '', createdAt: DateTime.parse(j['createdAt']), items: (j['items'] as List).map((e) => Item.fromJson(e)).toList()); }
 
 class CustomerStat { final String name, mobile, address, instagram; final int count, spent; final DateTime last; final List<Item> lastItems;
   CustomerStat(this.name, this.mobile, this.address, this.instagram, this.count, this.spent, this.last, this.lastItems);
@@ -37,23 +45,35 @@ class Store {
   static final Store I = Store._(); Store._();
   List<Product> products = []; List<Order> orders = []; Set<String> sent = {};
   Future<void> load() async {
-    final p = await SharedPreferences.getInstance(); final s = p.getString('demo3');
+    final p = await SharedPreferences.getInstance(); final s = p.getString('demo4');
     if (s == null) { seed(); await save(); return; }
     final j = jsonDecode(s); products = (j['products'] as List).map((e) => Product.fromJson(e)).toList(); orders = (j['orders'] as List).map((e) => Order.fromJson(e)).toList(); sent = ((j['sent'] ?? []) as List).cast<String>().toSet();
   }
-  Future<void> save() async => (await SharedPreferences.getInstance()).setString('demo3', jsonEncode({'products': products, 'orders': orders, 'sent': sent.toList()}));
+  Future<void> save() async => (await SharedPreferences.getInstance()).setString('demo4', jsonEncode({'products': products, 'orders': orders, 'sent': sent.toList()}));
   Future<void> reset() async { seed(); await save(); }
   void seed() { sent = {};
     products = [Product(1, 'شمع لیوانی کوچک', 180000), Product(2, 'شمع لیوانی بزرگ', 420000), Product(3, 'شمع گل‌سنگی', 250000), Product(4, 'پک هدیه سه‌تایی', 690000)];
     const c = [['مریم احمدی', '09121111111', 'تهران، ونک، خ ملاصدرا، پ ۱۲', 'maryam.ahmadi'], ['سارا کریمی', '09122222222', 'اصفهان، چهارباغ بالا، کوچه ۸', 'sara.karimi'], ['نگار رضایی', '09123333333', 'شیراز، معالی‌آباد، پ ۴', 'negar_rz'],
-      ['الهام موسوی', '09124444444', 'مشهد، سجاد، بلوار جامی', 'elham.mousavi'], ['زهرا نوری', '09125555555', 'کرج، گوهردشت، فاز ۲', 'zahra.noori']];
+      ['الهام موسوی', '09124444444', 'مشهد، سجاد، بلوار جامی', 'elham.mousavi'], ['زهرا نوری', '09125555555', 'کرج، گوهردشت، فاز ۲', 'zahra.noori'],
+      ['رها صادقی', '09126666666', 'تبریز، ولیعصر، خ توانیر', 'raha.sadeghi'], ['مینا حیدری', '09127777777', 'رشت، گلسار، خ ۹۵', 'mina_heydari']];
+    const extra = [['فاطمه جعفری', '09131000001', 'یزد، صفاییه', 'fatemeh.jfr'], ['نرگس امینی', '09131000002', 'قم، صفاشهر', 'narges.amini'], ['لیلا قاسمی', '09131000003', 'اهواز، کیانپارس', 'leila_ghasemi'],
+      ['سمیرا یوسفی', '09131000004', 'کرمان، بلوار جمهوری', 'samira.ysf'], ['پریسا کاظمی', '09131000005', 'ساری، خ فرهنگ', 'parisa.kz'], ['آزاده رحیمی', '09131000006', 'همدان، بوعلی', 'azadeh.rahimi'],
+      ['شیوا عباسی', '09131000007', 'قزوین، نوروزیان', 'shiva.abbasi'], ['مهسا اکبری', '09131000008', 'اراک، خ شهید بهشتی', 'mahsa.akbari']];
     const reviews = {10: [5, 'بوی شمع فوق‌العاده بود، بسته‌بندی هم خیلی شیک 🌸'], 11: [4, 'خوب بود، فقط ارسال یک روز دیر رسید'], 12: [2, 'یکی از شمع‌ها ترک داشت و فتیله‌اش کج بود']};
-    const spec = [[0, 2, 1, 'shipped', 45], [1, 1, 2, 'shipped', 40], [2, 4, 1, 'shipped', 35], [0, 2, 1, 'shipped', 10], [3, 3, 1, 'paid', 3], [4, 1, 3, 'paid', 2],
-      [3, 2, 2, 'awaiting_confirm', 1], [4, 3, 1, 'awaiting_confirm', 1], [3, 1, 1, 'pending_payment', 2], [4, 4, 1, 'pending_payment', 0], [1, 2, 1, 'delivered', 50], [2, 3, 1, 'delivered', 55], [4, 1, 2, 'delivered', 20]];
+    const spec = [[0, 2, 1, 'delivered', 45], [1, 1, 2, 'delivered', 40], [2, 4, 1, 'delivered', 35], [0, 2, 1, 'shipped', 10], [3, 3, 1, 'paid', 3], [4, 1, 3, 'paid', 2],
+      [3, 2, 2, 'awaiting_confirm', 1], [4, 3, 1, 'awaiting_confirm', 1], [3, 1, 1, 'pending_payment', 2], [4, 4, 1, 'pending_payment', 0], [1, 2, 1, 'delivered', 50], [2, 3, 1, 'delivered', 55], [4, 1, 2, 'delivered', 20], [5, 3, 1, 'shipped', 7], [6, 1, 2, 'shipped', 2], [5, 2, 1, 'delivered', 1], [6, 4, 1, 'delivered', 3]];
+    const unseenIdx = {11, 12, 15, 16}; const reviews2 = {15: [5, 'خیلی قشنگ بود، ممنون 🙏']};
     orders = [for (var i = 0; i < spec.length; i++) () { final s = spec[i]; final cu = c[s[0] as int]; final p = products[(s[1] as int) - 1]; final st = s[3] as String;
-      final rv = reviews[i];
+      final rv = reviews[i] ?? reviews2[i];
       return Order(id: i + 1, code: 'NR${1000 + i}', name: cu[0], mobile: cu[1], address: cu[2], instagram: cu[3], rating: rv == null ? 0 : rv[0] as int, comment: rv == null ? '' : rv[1] as String, status: st, payRef: st == 'pending_payment' ? '' : '${4000 + i * 7}',
-        hasReceipt: st == 'awaiting_confirm', postalCode: st == 'shipped' || st == 'delivered' ? '1234567890$i' : '', createdAt: DateTime.now().subtract(Duration(days: s[4] as int)), items: [Item(p.name, p.price, s[2] as int)]); }()];
+        hasReceipt: st == 'awaiting_confirm', postalCode: st == 'shipped' || st == 'delivered' ? '1234567890$i' : '', createdAt: DateTime.now().subtract(Duration(days: s[4] as int)), seen: !unseenIdx.contains(i), items: [Item(p.name, p.price, s[2] as int)]); }()];
+    // ~50 older archived orders (completed / cancelled) to demo archive grouping + pagination.
+    const cm = ['عالی بود 🌸', 'رایحه‌اش محشره', 'بسته‌بندی خیلی خوب بود', 'دیر رسید ولی خوب بود', 'سایزش از عکس کوچیک‌تر بود'];
+    for (var k = 0; k < 50; k++) { final cu = extra[k % extra.length]; final p = products[k % 4]; final st = k % 7 == 3 ? 'cancelled' : 'delivered'; final id = orders.length + 1;
+      final rt = st == 'cancelled' ? 0 : k % 5 == 0 ? 5 : k % 9 == 4 ? 3 : k % 4 == 1 ? 4 : 0;
+      orders.add(Order(id: id, code: 'NR${900 - k}', name: cu[0], mobile: cu[1], address: cu[2], instagram: cu[3], status: st, payRef: st == 'cancelled' ? '' : '${3000 + k * 11}',
+        postalCode: st == 'delivered' ? '98765432${10 + k}' : '', rating: rt, comment: rt == 0 ? '' : cm[k % cm.length], createdAt: DateTime.now().subtract(Duration(days: 60 + (k * 2.3).round(), hours: k % 9)),
+        items: [Item(p.name, p.price, 1 + k % 3)])); }
   }
   List<CustomerStat> customers() {
     final m = <String, List<Order>>{};
@@ -63,6 +83,8 @@ class Store {
   }
   List<CustomerStat> reorderDue() => customers().where((c) => c.daysSince >= 30 && c.daysSince <= 60).toList();
   Future<void> markSent(String mobile, bool v) async { v ? sent.add(mobile) : sent.remove(mobile); await save(); }
+  String deliveryMsg(Order o) => 'سلام ${o.name} عزیز 🌸 سفارش ${o.code} چند روز پیش با پست ارسال شده. به دستت رسید؟ اگه رسیده، لطفاً از این لینک «سفارش به دستم رسید» رو بزن و نظرت رو بگو: ${storeLink.replaceFirst('order.html?s=noora', 'track.html?c=${o.code}')} — $storeName';
+  Order? find(String code) { final c = code.trim().toUpperCase(); for (final o in orders) { if (o.code == c) return o; } return null; }
   String payReminder(Order o) => 'سلام ${o.name} عزیز 🌸 سفارش ${o.code} (${toman(o.total)}) هنوز منتظر واریزه. اگه هنوز می‌خوایش، از این لینک پرداخت و رسید رو بفرست: ${storeLink.replaceFirst('order.html?s=noora', 'order.html?s=noora&pay=${o.code}')} — $storeName';
   String reminder(CustomerStat c) => 'سلام ${c.name} عزیز 🌸 ${fa(c.daysSince)} روز از خرید ${c.lastItems.map((i) => i.name).join('، ')} گذشته. اگه شمعت رو به آخر رسوندی، با این لینک در یک دقیقه همون سفارش قبلی رو ثبت کن: $storeLink — $storeName';
   /// Simple regex heuristic: DM text -> draft order (no LLM).
