@@ -7,7 +7,7 @@
  <div class="sec">محصولات</div>
  <div class="card" id="products" style="padding:4px 16px"></div>
  <div class="sec">اطلاعات ارسال</div>
- <div class="card"><label for="name">نام و نام خانوادگی</label><input id="name"><label for="address">آدرس کامل و کد پستی</label><textarea id="address" rows="3"></textarea><label for="note">توضیحات (اختیاری)</label><input id="note" placeholder="مثلاً رایحه یا رنگ دلخواه"></div>
+ <div class="card"><label for="name">نام و نام خانوادگی</label><input id="name"><label for="ig">آیدی اینستاگرام (برای پیگیری و ارتباط)</label><input id="ig" placeholder="@your.id" dir="ltr" style="text-align:right" autocapitalize="off"><label for="address">آدرس کامل و کد پستی</label><textarea id="address" rows="3"></textarea><label for="note">توضیحات (اختیاری)</label><input id="note" placeholder="مثلاً رایحه یا رنگ دلخواه"></div>
  <p id="err1" class="err"></p>
  <div class="bar-bottom"><div class="in"><div class="tot"><small>جمع کل</small><b id="total">۰ تومان</b></div><button id="submit">ادامه و پرداخت</button></div></div>
 </section>
@@ -33,12 +33,12 @@ api('/api/public/' + slug).then(s => { shop = s; $('#shop').textContent = s.name
 $('#mobile').addEventListener('input', async e => {
   const m = e.target.value.replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)); if (m.replace(/\D/g, '').length < 11) return;
   const r = await api(`/api/public/${slug}/lookup?mobile=${m}`); if (!r.found) return;
-  $('#name').value = r.name; $('#address').value = r.address; last = r.lastItems;
+  $('#name').value = r.name; $('#address').value = r.address; if (r.instagram) $('#ig').value = '@' + r.instagram; last = r.lastItems;
   $('#welcome').style.display = 'block';
   $('#welcome').innerHTML = `<div>خوش برگشتی <b>${r.name}</b>! آدرست پر شد.</div>` + (last.length ? `<button class="ghost" onclick="repeat()">↻ همون سفارش قبلی: ${last.map(i => fa(i.qty) + ' ' + i.name).join('، ')}</button>` : '');
 });
 $('#submit').onclick = async () => { $('#err1').textContent = '';
-  try { order = await api(`/api/public/${slug}/orders`, { method: 'POST', body: { mobile: $('#mobile').value, name: $('#name').value, address: $('#address').value, note: $('#note').value, items: Object.entries(qty).map(([productId, q]) => ({ productId, qty: q })) } });
+  try { order = await api(`/api/public/${slug}/orders`, { method: 'POST', body: { mobile: $('#mobile').value, name: $('#name').value, address: $('#address').value, instagram: $('#ig').value, note: $('#note').value, items: Object.entries(qty).map(([productId, q]) => ({ productId, qty: q })) } });
     $('#step1').style.display = 'none'; $('#step2').style.display = 'block'; $('#s1').className = 'st done'; $('#s1 i').textContent = '✓'; $('#s2').className = 'st on'; scrollTo(0, 0);
     $('#code').textContent = order.code; $('#amt').textContent = toman(order.total); $('#cardno').textContent = shop.card; $('#owner').textContent = 'به نام ' + shop.cardOwner;
   } catch (e) { $('#err1').textContent = e.message; } };

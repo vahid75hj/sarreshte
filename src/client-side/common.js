@@ -22,17 +22,23 @@ const routes = [
     if (o.status !== 'pending_payment') throw 'این سفارش قبلاً پرداخت شده'; if (b.method === 'card' && !b.ref) throw 'شماره پیگیری یا ۴ رقم آخر کارت را وارد کنید';
     const r = payments[b.method](o); o.payment = { method: b.method, ref: b.ref || r.ref, receipt: b.receipt, at: new Date().toISOString() };
     o.status = r.status; o.history.push({ status: r.status, at: o.payment.at }); return o; }],
+  [/^\/api\/public\/orders\/(\w+)\/delivered$/, (d, [c]) => { const o = d.orders.find(x => x.code === c); if (!o) throw 'سفارش پیدا نشد';
+    if (o.status !== 'shipped') throw 'این سفارش هنوز ارسال نشده'; o.status = 'delivered'; o.history.push({ status: 'delivered', at: new Date().toISOString() }); return o; }],
+  [/^\/api\/public\/orders\/(\w+)\/review$/, (d, [c], b) => { const o = d.orders.find(x => x.code === c); if (!o) throw 'سفارش پیدا نشد';
+    const r = +b.rating; if (!(r >= 1 && r <= 5)) throw 'لطفاً امتیاز بدهید'; o.review = { rating: r, comment: b.comment || '', private: r <= 3, at: new Date().toISOString() };
+    const sl = d.sellers.find(x => x.slug === o.seller); return { ...o, shopInstagram: sl && sl.instagram }; }],
   [/^\/api\/public\/orders\/(\w+)$/, (d, [c]) => { const o = d.orders.find(x => x.code === c); if (!o) throw 'سفارش پیدا نشد'; return o; }],
   [/^\/api\/public\/(\w+)\/lookup\?mobile=(.*)$/, (d, [s, m]) => { const c = d.customers.find(x => x.seller === s && x.mobile === normMobile(m)); if (!c) return { found: false };
     const last = d.orders.filter(o => o.customerId === c.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-    return { found: true, name: c.name, address: c.address, lastItems: last ? last.items : [] }; }],
+    return { found: true, name: c.name, address: c.address, instagram: c.instagram || '', lastItems: last ? last.items : [] }; }],
   [/^\/api\/public\/(\w+)\/orders$/, (d, [s], b) => { const mobile = normMobile(b.mobile);
     if (!b.name || !b.address || !/^09\d{9}$/.test(mobile)) throw 'نام، موبایل معتبر و آدرس لازم است';
     const items = b.items.filter(i => i.qty > 0).map(i => { const p = d.products.find(x => x.id === +i.productId); return { productId: p.id, name: p.name, price: p.price, qty: +i.qty }; });
     if (!items.length) throw 'حداقل یک محصول انتخاب کنید';
+    const ig = String(b.instagram || '').trim().replace(/^@+/, '').replace(/[^\w.]/g, '');
     let c = d.customers.find(x => x.seller === s && x.mobile === mobile);
-    if (!c) { c = { id: d.nextId.customer++, seller: s, name: b.name, mobile, address: b.address }; d.customers.push(c); } else Object.assign(c, { name: b.name, address: b.address });
-    const at = new Date().toISOString(); const o = { id: d.nextId.order++, seller: s, code: 'NR' + Math.floor(100000 + Math.random() * 900000), customerId: c.id, name: b.name, mobile, address: b.address, note: b.note,
+    if (!c) { c = { id: d.nextId.customer++, seller: s, name: b.name, mobile, address: b.address, instagram: ig }; d.customers.push(c); } else Object.assign(c, { name: b.name, address: b.address, instagram: ig });
+    const at = new Date().toISOString(); const o = { id: d.nextId.order++, seller: s, code: 'NR' + Math.floor(100000 + Math.random() * 900000), customerId: c.id, name: b.name, mobile, address: b.address, instagram: ig, note: b.note,
       items, total: items.reduce((a, x) => a + x.price * x.qty, 0), status: 'pending_payment', payment: null, postalCode: '', createdAt: at, history: [{ status: 'pending_payment', at }] };
     d.orders.push(o); return o; }],
   [/^\/api\/public\/(\w+)$/, (d, [s]) => { const sl = d.sellers.find(x => x.slug === s); if (!sl) throw 'فروشگاه پیدا نشد'; return { ...sl, pin: undefined, products: d.products.filter(p => p.seller === s && p.active) }; }],

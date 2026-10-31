@@ -7,24 +7,42 @@ function copyText(t,b){const done=()=>{const o=b.textContent;b.textContent='کپ
  const fb=()=>{const a=document.createElement('textarea');a.value=t;a.setAttribute('readonly','');a.style.position='fixed';a.style.opacity='0';document.body.appendChild(a);a.select();a.setSelectionRange(0,99999);try{document.execCommand('copy')}catch(e){}document.body.removeChild(a);done()};
  if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t).then(done,fb)}else fb()}
 const code = new URLSearchParams(location.search).get("c");
-const label = { pending_payment: 'منتظر پرداخت', awaiting_confirm: 'منتظر تأیید واریز', paid: 'پرداخت تأیید شد', shipped: 'ارسال شد', cancelled: 'لغو شد' };
-api('/api/public/orders/' + code).then(o => {
-  const lvl = { pending_payment: 1, awaiting_confirm: 1, paid: 2, shipped: 3 }[o.status] || 0;
+const label = { pending_payment: 'منتظر پرداخت', awaiting_confirm: 'منتظر تأیید واریز', paid: 'پرداخت تأیید شد', shipped: 'ارسال شد', delivered: 'تحویل شد · تکمیل شده', cancelled: 'لغو شد' };
+function load() { api('/api/public/orders/' + code).then(o => {
+  const lvl = { pending_payment: 1, awaiting_confirm: 1, paid: 2, shipped: 3, delivered: 4 }[o.status] || 0;
   const at = s => (o.history.find(h => h.status === s) || {}).at;
   const steps = [
     ['ثبت سفارش', faDate(o.createdAt), lvl >= 1],
     [o.status === 'pending_payment' ? 'منتظر پرداخت' : o.status === 'awaiting_confirm' ? 'رسید رسید؛ منتظر تأیید فروشنده' : 'پرداخت تأیید شد', o.payment ? faDate(o.payment.at) : 'هنوز پرداخت نشده', lvl >= 2],
-    ['ارسال با پست', o.postalCode ? 'کد رهگیری ثبت شد' : (o.status === 'paid' ? 'در حال آماده‌سازی؛ بعد از ارسال، کد رهگیری مرسوله اینجا نمایش داده می‌شود' : 'بعد از تأیید پرداخت'), lvl >= 3]];
+    ['ارسال با پست', o.postalCode ? 'کد رهگیری ثبت شد' : (o.status === 'paid' ? 'در حال آماده‌سازی؛ بعد از ارسال، کد رهگیری مرسوله اینجا نمایش داده می‌شود' : 'بعد از تأیید پرداخت'), lvl >= 3],
+    ['تحویل به مشتری', at('delivered') ? faDate(at('delivered')) : (o.status === 'shipped' ? 'وقتی بسته به دستت رسید، دکمه‌ی پایین را بزن' : 'بعد از ارسال'), lvl >= 4]];
   const cur = steps.findIndex(s => !s[2]);
-  const pc = o.status === 'shipped' || o.status === 'paid' ? 'pos' : o.status === 'cancelled' ? 'neg' : '';
+  const pc = ['shipped', 'paid', 'delivered'].includes(o.status) ? 'pos' : o.status === 'cancelled' ? 'neg' : '';
   $('#box').innerHTML = `
    <div class="card"><div class="row" style="padding:0"><div><div class="muted">سفارش ${o.code}</div><div style="font-weight:800;font-size:18px">${o.name}</div></div><span class="pill ${pc}">${label[o.status]}</span></div></div>
    ${o.status === 'cancelled' ? '<div class="note" style="color:var(--neg);margin-bottom:12px">این سفارش لغو شده است.</div>' : `
    <div class="card"><ul class="tl">${steps.map(([t, d, done], i) => `<li class="${done ? 'done' : i === cur ? 'cur' : ''}"><span class="dot">${done ? '✓' : fa(i + 1)}</span><div class="t">${t}</div><div class="d">${d}</div></li>`).join('')}</ul></div>`}
    ${o.postalCode ? `<div class="card"><div class="muted">کد رهگیری پست</div><div class="row" style="padding:4px 0 0"><span class="track-code">${o.postalCode}</span><button class="copy" onclick="copyText('${o.postalCode}',this)">کپی کد</button><a href="https://tracking.post.ir/?id=${o.postalCode}" target="_blank">پیگیری در سایت پست ←</a></div></div>` : ''}
+   ${o.status === 'shipped' ? `<div class="card"><button id="got" onclick="gotIt()">سفارش به دستم رسید ✓</button></div>` : ''}
+   ${o.status === 'delivered' ? reviewBox(o) : ''}
    <div class="card"><div class="muted">لینک پیگیری این سفارش</div><div class="row" style="padding:6px 0 0;gap:8px"><span class="track-code" style="font-size:12px;direction:ltr;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${location.href}</span><button class="copy" onclick="copyText(location.href,this)">کپی لینک</button></div></div>
    <div class="sec">جزئیات سفارش</div>
    <div class="card" style="padding:10px 16px">${o.items.map(i => `<div class="row"><span>${fa(i.qty)} × ${i.name}</span><span>${toman(i.price * i.qty)}</span></div>`).join('')}
-    <hr><div class="row"><b>جمع</b><b>${toman(o.total)}</b></div><div class="row"><span class="k">ارسال به</span><span style="text-align:left">${o.address}</span></div></div>`;
-}).catch(e => $('#box').innerHTML = `<div class="card">${e.message}</div>`);
+    <hr><div class="row"><b>جمع</b><b>${toman(o.total)}</b></div>${o.instagram ? `<div class="row"><span class="k">اینستاگرام</span><span dir="ltr">@${o.instagram}</span></div>` : ''}<div class="row"><span class="k">ارسال به</span><span style="text-align:left">${o.address}</span></div></div>`;
+}).catch(e => $('#box').innerHTML = `<div class="card">${e.message}</div>`); }
+let rating = 0;
+const shopIg = () => (db().sellers[0] || {}).instagram || 'noora.candle';
+function igBtn() { return `<a class="btn-link" href="https://instagram.com/${shopIg()}" target="_blank" rel="noopener"><button>نظرت رو توی اینستاگرام هم بنویس</button></a>`; }
+function reviewBox(o) {
+  const r = o.review;
+  if (r) return `<div class="card"><div class="muted">نظر شما</div><div style="font-size:22px;color:#E0A43A;margin:6px 0">${'★'.repeat(r.rating)}<span style="color:var(--line)">${'★'.repeat(5 - r.rating)}</span></div>${r.comment ? `<p style="margin:0 0 10px">${r.comment}</p>` : ''}
+    ${r.rating >= 4 ? `<div class="note pos" style="margin-bottom:10px">ممنون از نظر خوبت! 🌸 اگه دوست داری توی اینستاگرام فروشگاه هم بنویس.</div>${igBtn()}` : `<div class="note">ممنون که گفتی. نظرت فقط به‌صورت خصوصی برای فروشنده فرستاده شد و جایی منتشر نمی‌شود؛ فروشنده برای پیگیری با شما تماس می‌گیرد.</div>`}</div>`;
+  return `<div class="card"><div style="font-weight:800;margin-bottom:6px">سفارشت چطور بود؟</div><div class="muted">به سفارش امتیاز بده</div>
+    <div id="stars" style="font-size:34px;letter-spacing:6px;cursor:pointer;margin:8px 0;direction:ltr;text-align:center">${[1,2,3,4,5].map(n => `<span data-n="${n}" onclick="setR(${n})" style="color:var(--line)">★</span>`).join('')}</div>
+    <label for="cm">نظرت (اختیاری)</label><textarea id="cm" rows="3" placeholder="مثلاً درباره‌ی رایحه، بسته‌بندی یا ارسال"></textarea><p id="rerr" class="err"></p><button onclick="sendReview()">ثبت نظر</button></div>`;
+}
+function setR(n) { rating = n; document.querySelectorAll('#stars span').forEach(s => s.style.color = +s.dataset.n <= n ? '#E0A43A' : 'var(--line)'); }
+async function gotIt() { await api(`/api/public/orders/${code}/delivered`, { method: 'POST' }); load(); }
+async function sendReview() { try { await api(`/api/public/orders/${code}/review`, { method: 'POST', body: { rating, comment: $('#cm').value } }); load(); } catch (e) { $('#rerr').textContent = e.message; } }
+load();
 </script></main></body></html>

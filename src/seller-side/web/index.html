@@ -18,7 +18,7 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="سررشته - اپ فروشنده">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -31,8 +31,26 @@
 
   <title>سررشته · اپ فروشنده</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    @font-face{font-family:SplashVazir;src:url(splash-font.woff2) format("woff2");font-weight:700}
+    :root{--bg:#F7F7F5;--out:#ECEBE7;--text:#111111;--muted:#8A8A8A;--line:#E7E6E1}
+    @media (prefers-color-scheme: dark){:root{--bg:#0E0E0E;--out:#070707;--text:#F5F5F5;--muted:#8A8A8A;--line:#262626}}
+    html[data-theme=light]{--bg:#F7F7F5;--out:#ECEBE7;--text:#111111;--line:#E7E6E1}
+    html[data-theme=dark]{--bg:#0E0E0E;--out:#070707;--text:#F5F5F5;--line:#262626}
+    html,body{margin:0;height:100%;background:var(--out)}
+    #splash{position:fixed;inset:0;z-index:9;display:flex;justify-content:center;background:var(--out);transition:opacity .25s}
+    #splash .col{width:100%;max-width:430px;background:var(--bg);border-inline:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:SplashVazir,Tahoma,sans-serif;direction:rtl}
+    #splash .logo{width:64px;height:64px;border-radius:18px;background:var(--text);color:var(--bg);display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:700}
+    #splash h1{margin:0;color:var(--text);font-size:28px;font-weight:700}
+    #splash p{margin:0;color:var(--muted);font-size:13px}
+    #splash .sp{width:22px;height:22px;margin-top:18px;border:2px solid var(--line);border-top-color:var(--text);border-radius:50%;animation:r .8s linear infinite}
+    @keyframes r{to{transform:rotate(360deg)}}
+  </style>
+  <script>var t=new URLSearchParams(location.search).get('theme');if(t)document.documentElement.dataset.theme=t;</script>
 </head>
 <body>
+  <div id="splash"><div class="col"><div class="logo">س</div><h1>سررشته</h1><p>اپ فروشنده · در حال بارگذاری…</p><div class="sp"></div></div></div>
+  <script>window.addEventListener('flutter-first-frame',function(){var s=document.getElementById('splash');if(!s)return;s.style.opacity='0';setTimeout(function(){s.remove()},300);});</script>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader

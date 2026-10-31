@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'data.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
@@ -27,10 +28,20 @@ class App extends StatelessWidget {
       locale: const Locale('fa'), supportedLocales: const [Locale('fa')],
       localizationsDelegates: const [GlobalMaterialLocalizations.delegate, GlobalWidgetsLocalizations.delegate, GlobalCupertinoLocalizations.delegate],
       theme: AppTheme.build(Brightness.light), darkTheme: AppTheme.build(Brightness.dark), themeMode: mode,
+      builder: (context, child) { final c = AppColors.of(context); final dark = Theme.of(context).brightness == Brightness.dark;
+        // Always mobile layout: centered phone-width column on wide screens.
+        return ColoredBox(color: dark ? const Color(0xFF070707) : const Color(0xFFECEBE7), child: Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 430),
+          child: DecoratedBox(decoration: BoxDecoration(border: Border.symmetric(vertical: BorderSide(color: c.line))), child: ClipRect(child: child)))));
+      },
       home: const LoginPage()));
 }
 
 void snack(BuildContext c, String m) => ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text(m)));
+Future<void> openIg(BuildContext ctx, String handle, {bool dm = true}) async {
+  final h = handle.replaceAll('@', '').trim(); if (h.isEmpty) { snack(ctx, 'آیدی اینستاگرام ثبت نشده'); return; }
+  if (!await launchUrl(Uri.parse(dm ? 'https://ig.me/m/$h' : 'https://instagram.com/$h'), webOnlyWindowName: '_blank')) {
+    await launchUrl(Uri.parse('https://instagram.com/$h'), webOnlyWindowName: '_blank'); }
+}
 void copy(BuildContext c, String t) { Clipboard.setData(ClipboardData(text: t)); snack(c, 'کپی شد'); }
 String ago(DateTime d) { final n = DateTime.now().difference(d); return n.inDays > 0 ? '${fa(n.inDays)} روز پیش' : n.inHours > 0 ? '${fa(n.inHours)} ساعت پیش' : 'همین الان'; }
 
@@ -40,7 +51,7 @@ class StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    final col = switch (status) { 'shipped' || 'paid' => c.positive, 'cancelled' => c.negative, 'awaiting_confirm' => c.text, _ => c.textMuted };
+    final col = switch (status) { 'shipped' || 'paid' || 'delivered' => c.positive, 'cancelled' => c.negative, 'awaiting_confirm' => c.text, _ => c.textMuted };
     return Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(color: col.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(20), border: Border.all(color: col.withValues(alpha: 0.25))),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -63,13 +74,17 @@ class _LoginState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) { final c = AppColors.of(context);
     return Scaffold(body: SafeArea(child: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 380), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Align(alignment: AlignmentDirectional.centerStart, child: Container(width: 56, height: 56, decoration: BoxDecoration(color: c.accent, borderRadius: BorderRadius.circular(16)),
-        child: Icon(Icons.receipt_long_rounded, color: c.onAccent, size: 28))),
-      const SizedBox(height: 28),
-      Text(storeName, style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: c.text)),
-      const SizedBox(height: 6),
-      Text('سررشته · همه‌ی سفارش‌ها یک‌جا؛ هیچ سفارشی گم نمی‌شه.', style: TextStyle(fontSize: 15, color: c.textMuted)),
-      const SizedBox(height: 32),
+      Row(children: [Container(width: 48, height: 48, decoration: BoxDecoration(color: c.accent, borderRadius: BorderRadius.circular(14)),
+        child: Icon(Icons.receipt_long_rounded, color: c.onAccent, size: 24)), const SizedBox(width: 12),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('سررشته', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: c.text)),
+          Text('مدیریت سفارش فروشنده‌های اینستاگرامی', style: TextStyle(fontSize: 13, color: c.textMuted))])]),
+      const SizedBox(height: 36),
+      Text('ورود به حساب فروشگاه', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: c.text)),
+      const SizedBox(height: 16),
+      TextField(readOnly: true, enabled: false, controller: TextEditingController(text: shopAccount), textDirection: TextDirection.ltr,
+        style: TextStyle(color: c.textMuted), decoration: InputDecoration(labelText: 'حساب فروشگاه', helperText: 'فروشگاه: $storeName (حساب نمونه‌ی دمو)',
+          prefixIcon: const Icon(Icons.storefront_outlined), suffixIcon: const Icon(Icons.lock_outline_rounded, size: 18), filled: true, fillColor: c.accentSoft)),
+      const SizedBox(height: 16),
       TextField(controller: pin, obscureText: true, keyboardType: TextInputType.number, textAlign: TextAlign.center, onSubmitted: (_) => go(),
         style: const TextStyle(fontSize: 22, letterSpacing: 8, fontWeight: FontWeight.w700),
         decoration: InputDecoration(labelText: 'رمز ورود', errorText: err.isEmpty ? null : err)),
@@ -119,7 +134,8 @@ class _HomeState extends State<Home> {
 
 class OrdersPage extends StatefulWidget { final VoidCallback onChange; const OrdersPage({super.key, required this.onChange}); @override State<OrdersPage> createState() => _OrdersState(); }
 class _OrdersState extends State<OrdersPage> {
-  static const groups = {0: ['pending_payment', 'awaiting_confirm'], 1: ['paid'], 2: ['shipped']};
+  static const groups = {0: ['pending_payment', 'awaiting_confirm'], 1: ['paid'], 2: ['shipped'], 3: ['delivered']};
+  static const gl = ['منتظر واریز', 'پرداخت‌شده', 'ارسال‌شده', 'تکمیل‌شده'];
   int g = 0;
   @override
   Widget build(BuildContext context) {
@@ -149,11 +165,8 @@ class _OrdersState extends State<OrdersPage> {
           ]),
         ])),
       const SizedBox(height: 20),
-      SizedBox(width: double.infinity, child: SegmentedButton<int>(showSelectedIcon: false, segments: [
-        ButtonSegment(value: 0, label: Text('منتظر واریز ${fa(n(0))}')),
-        ButtonSegment(value: 1, label: Text('پرداخت‌شده ${fa(n(1))}')),
-        ButtonSegment(value: 2, label: Text('ارسال‌شده ${fa(n(2))}'))],
-        selected: {g}, onSelectionChanged: (s) => setState(() => g = s.first))),
+      SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [for (var i = 0; i < 4; i++) Padding(padding: const EdgeInsetsDirectional.only(end: 8),
+        child: ChoiceChip(showCheckmark: false, label: Text('${gl[i]} ${fa(n(i))}'), selected: g == i, onSelected: (_) => setState(() => g = i)))])),
       const SizedBox(height: 12),
       if (list.isEmpty) Padding(padding: const EdgeInsets.all(40), child: Center(child: Text('سفارشی اینجا نیست', style: TextStyle(color: c.textMuted)))),
       for (final o in list) Padding(padding: const EdgeInsets.only(bottom: 10), child: OrderCard(o, onTap: () async {
@@ -213,10 +226,24 @@ class _OrderState extends State<OrderPage> {
           Text(o.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 2), Text(fa(int.parse(o.mobile)).replaceAll(',', '').padLeft(11, '۰'), style: TextStyle(color: c.textMuted)),
           const SizedBox(height: 6), Text(o.address, style: TextStyle(color: c.text, height: 1.6)),
+          if (o.instagram.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: InkWell(onTap: () => openIg(context, o.instagram),
+            child: Text('اینستاگرام: @${o.instagram}', textDirection: TextDirection.ltr, style: TextStyle(color: c.text, fontWeight: FontWeight.w600)))),
           if (o.note.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text('توضیح: ${o.note}', style: TextStyle(color: c.textMuted))),
         ])),
         IconButton(tooltip: 'کپی برای برچسب پست', icon: const Icon(Icons.copy_rounded, size: 20), onPressed: () => copy(context, '${o.name}\n${o.mobile}\n${o.address}')),
       ]))),
+      if (o.status == 'delivered') ...[
+        const SectionTitle('نظر مشتری'),
+        Card(child: Padding(padding: pad, child: o.rating == 0 ? Text('مشتری تحویل را تأیید کرده؛ هنوز نظری ثبت نکرده.', style: TextStyle(color: c.textMuted)) : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [for (var i = 1; i <= 5; i++) Icon(Icons.star_rounded, size: 22, color: i <= o.rating ? const Color(0xFFE0A43A) : c.line), const Spacer(),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(borderRadius: BorderRadius.circular(20),
+              color: (o.privateReview ? c.negative : c.positive).withValues(alpha: 0.10), border: Border.all(color: (o.privateReview ? c.negative : c.positive).withValues(alpha: 0.25))),
+              child: Text(o.privateReview ? 'بازخورد خصوصی' : 'به اینستاگرام هدایت شد', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: o.privateReview ? c.negative : c.positive)))]),
+          if (o.comment.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text('«${o.comment}»', style: TextStyle(color: c.text, height: 1.7))),
+          if (o.privateReview) Padding(padding: const EdgeInsets.only(top: 8), child: Text('این نظر فقط برای شما فرستاده شده و جایی منتشر نشده؛ بهتر است با مشتری تماس بگیرید.', style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.6))),
+          if (o.privateReview && o.instagram.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: OutlinedButton.icon(icon: const Icon(Icons.send_rounded, size: 18), label: const Text('پیام به مشتری در دایرکت'), onPressed: () => openIg(context, o.instagram))),
+        ]))),
+      ],
       const SectionTitle('اقلام'),
       Card(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), child: Column(children: [
         for (final i in o.items) row('${fa(i.qty)} × ${i.name}', toman(i.price * i.qty)),
@@ -261,22 +288,42 @@ class CustomersPage extends StatelessWidget { const CustomersPage({super.key});
   }
 }
 
-class ReorderPage extends StatelessWidget { const ReorderPage({super.key});
+class ReorderPage extends StatefulWidget { const ReorderPage({super.key}); @override State<ReorderPage> createState() => _ReorderState(); }
+class _ReorderState extends State<ReorderPage> {
+  Future<void> mark(CustomerStat x, bool v) async { await Store.I.markSent(x.mobile, v); setState(() {});
+    if (mounted && v) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${x.name} به «ارسال‌شده‌ها» رفت'), action: SnackBarAction(label: 'برگردان', onPressed: () => mark(x, false)))); }
   @override
-  Widget build(BuildContext context) { final l = Store.I.reorderDue(); final c = AppColors.of(context);
+  Widget build(BuildContext context) { final all = Store.I.reorderDue(); final c = AppColors.of(context);
+    final todo = all.where((x) => !Store.I.sent.contains(x.mobile)).toList(), done = all.where((x) => Store.I.sent.contains(x.mobile)).toList();
     return ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 24), children: [
-      Text('مشتری‌هایی که ۳۰ تا ۶۰ روز پیش خرید کرده‌اند. پیام آماده را کپی کن و در دایرکت بفرست.', style: TextStyle(color: c.textMuted, height: 1.7)),
-      const SizedBox(height: 12),
-      if (l.isEmpty) Padding(padding: const EdgeInsets.all(40), child: Center(child: Text('فعلاً کسی نیست.', style: TextStyle(color: c.textMuted)))),
-      for (final x in l) Padding(padding: const EdgeInsets.only(bottom: 10), child: Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [Text(x.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)), const Spacer(),
+      Text('مشتری‌هایی که ۳۰ تا ۶۰ روز پیش خرید کرده‌اند. پیام را کپی کن، دایرکتشان را باز کن و بفرست؛ بعد «ارسال کردم» را بزن.', style: TextStyle(color: c.textMuted, height: 1.7)),
+      SectionTitle('برای ارسال · ${fa(todo.length)}'),
+      if (todo.isEmpty) Padding(padding: const EdgeInsets.all(28), child: Center(child: Text('همه‌ی یادآوری‌ها ارسال شده ✓', style: TextStyle(color: c.textMuted)))),
+      for (final x in todo) Padding(padding: const EdgeInsets.only(bottom: 10), child: Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [Text(x.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)), const SizedBox(width: 8),
+          if (x.instagram.isNotEmpty) Text('@${x.instagram}', textDirection: TextDirection.ltr, style: TextStyle(color: c.textMuted, fontSize: 12)), const Spacer(),
           Text('${fa(x.daysSince)} روز پیش', style: TextStyle(color: c.textFaint, fontSize: 12))]),
         const SizedBox(height: 10),
         Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: c.background, borderRadius: BorderRadius.circular(12), border: Border.all(color: c.line)),
           child: Text(Store.I.reminder(x), style: TextStyle(color: c.textMuted, height: 1.7, fontSize: 13))),
         const SizedBox(height: 10),
-        OutlinedButton.icon(icon: const Icon(Icons.copy_rounded, size: 18), label: const Text('کپی پیام'), onPressed: () => copy(context, Store.I.reminder(x))),
-      ]))))]);
+        Row(children: [
+          Expanded(child: OutlinedButton.icon(icon: const Icon(Icons.copy_rounded, size: 18), label: const Text('کپی پیام'), onPressed: () => copy(context, Store.I.reminder(x)))),
+          const SizedBox(width: 8),
+          Expanded(child: OutlinedButton.icon(icon: const Icon(Icons.send_rounded, size: 18), label: const Text('باز کردن دایرکت'), onPressed: () { copy(context, Store.I.reminder(x)); openIg(context, x.instagram); })),
+        ]),
+        const SizedBox(height: 8),
+        FilledButton.icon(icon: const Icon(Icons.check_rounded), label: const Text('ارسال کردم'), onPressed: () => mark(x, true)),
+      ])))),
+      if (done.isNotEmpty) ...[
+        SectionTitle('ارسال‌شده · ${fa(done.length)}'),
+        Card(child: Column(children: [for (final (i, x) in done.indexed) ...[
+          if (i > 0) Divider(color: c.line, indent: 16, endIndent: 16),
+          ListTile(leading: Icon(Icons.check_circle_rounded, color: c.positive), title: Text(x.name, style: TextStyle(color: c.textMuted, fontWeight: FontWeight.w600)),
+            subtitle: Text('یادآوری فرستاده شد', style: TextStyle(color: c.textFaint, fontSize: 12)),
+            trailing: TextButton(onPressed: () => mark(x, false), child: const Text('برگردان')))]])),
+      ],
+    ]);
   }
 }
 
