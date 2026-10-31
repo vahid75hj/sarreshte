@@ -74,8 +74,8 @@ class _LoginState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) { final c = AppColors.of(context);
     return Scaffold(body: SafeArea(child: Center(child: SingleChildScrollView(padding: const EdgeInsets.all(24), child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 380), child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Row(children: [Container(width: 48, height: 48, decoration: BoxDecoration(color: c.accent, borderRadius: BorderRadius.circular(14)),
-        child: Icon(Icons.receipt_long_rounded, color: c.onAccent, size: 24)), const SizedBox(width: 12),
+      Row(children: [Container(width: 52, height: 52, clipBehavior: Clip.antiAlias, decoration: BoxDecoration(borderRadius: BorderRadius.circular(14), border: Border.all(color: c.line)),
+        child: Image.asset('assets/icon/main.png', fit: BoxFit.cover)), const SizedBox(width: 12),
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('سررشته', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: c.text)),
           Text('مدیریت سفارش فروشنده‌های اینستاگرامی', style: TextStyle(fontSize: 13, color: c.textMuted))])]),
       const SizedBox(height: 36),
