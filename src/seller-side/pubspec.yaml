@@ -39,6 +39,14 @@ dependencies:
     sdk: flutter
   url_launcher: ^6.3.3
   app_links: ^7.2.2
+  hooks_riverpod: ^3.4.3
+  flutter_hooks: ^0.21.3+1
+  riverpod_annotation: ^4.0.7
+  get_it: ^9.3.0
+  fpdart: ^1.2.0
+  equatable: ^3.0.0
+  freezed_annotation: ^3.1.0
+  json_annotation: ^4.12.0
 
 dev_dependencies:
   flutter_launcher_icons: ^0.14.4
@@ -51,6 +59,10 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  build_runner: ^2.16.2
+  riverpod_generator: ^4.0.9
+  freezed: ^4.0.3
+  json_serializable: ^6.15.2
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

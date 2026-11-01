@@ -15,6 +15,8 @@ analyzer:
     - android/**
     - ios/**
     - web/**
+    - lib/**/*.g.dart
+    - lib/**/*.freezed.dart
 
 linter:
   # The lint rules applied to this project can be customized in the
@@ -28,6 +30,8 @@ linter:
   # `// ignore_for_file: name_of_lint` syntax on the line or in the file
   # producing the lint.
   rules:
+    # mpm convention: private fields set from named constructor params (`_repository = repository`).
+    prefer_initializing_formals: false
     # avoid_print: false  # Uncomment to disable the `avoid_print` rule
     # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
 
