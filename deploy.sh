@@ -2,7 +2,7 @@
 # Usage: ./deploy.sh [--apk] [--no-push] ["commit message"]
 set -euo pipefail
 cd "$(dirname "$0")"
-FLUTTER="${FLUTTER:-$(command -v flutter || echo /Users/vahid/.puro/envs/default/flutter/bin/flutter)}"
+FLUTTER="${FLUTTER:-/Users/vahid/.puro/envs/env_3_44_9/flutter/bin/flutter}"
 APK=0; PUSH=1; MSG="Update MVP"
 for a in "$@"; do case "$a" in --apk) APK=1;; --no-push) PUSH=0;; *) MSG="$a";; esac; done
 echo "== client"; mkdir -p client; cp -R src/client-side/. client/
