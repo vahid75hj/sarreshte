@@ -22,7 +22,8 @@ class Item { String name; int price; int qty; Item(this.name, this.price, this.q
 class Order { int id; String code, name, mobile, address, note, status, payRef, postalCode, instagram, comment; int rating; bool hasReceipt, seen; DateTime createdAt; List<Item> items;
   Order({required this.id, required this.code, required this.name, required this.mobile, required this.address, this.note = '', required this.status,
     this.payRef = '', this.postalCode = '', this.instagram = '', this.comment = '', this.rating = 0, this.hasReceipt = false, this.seen = true, required this.createdAt, required this.items});
-  bool get archived => status == 'delivered' || status == 'cancelled';
+  bool get cancelled => status == 'cancelled' || status == 'cancelled_by_customer';
+  bool get archived => status == 'delivered' || cancelled;
   bool get unseen => status == 'delivered' && !seen;
   bool get followUp => status == 'shipped' && DateTime.now().difference(createdAt).inDays >= deliveryFollowUpDays;
   bool get payReminder => status == 'pending_payment' && DateTime.now().difference(createdAt).inHours >= 24;
@@ -39,17 +40,17 @@ class CustomerStat { final String name, mobile, address, instagram; final int co
   CustomerStat(this.name, this.mobile, this.address, this.instagram, this.count, this.spent, this.last, this.lastItems);
   int get daysSince => DateTime.now().difference(last).inDays; }
 
-const statusLabels = {'pending_payment': 'منتظر واریز', 'awaiting_confirm': 'منتظر تأیید واریز', 'paid': 'پرداخت‌شده', 'shipped': 'ارسال‌شده', 'delivered': 'تکمیل‌شده', 'cancelled': 'لغو‌شده'};
+const statusLabels = {'pending_payment': 'منتظر واریز', 'awaiting_confirm': 'منتظر تأیید واریز', 'paid': 'پرداخت‌شده', 'shipped': 'ارسال‌شده', 'delivered': 'تکمیل‌شده', 'cancelled': 'لغو‌شده', 'cancelled_by_customer': 'لغو توسط مشتری'};
 
 class Store {
   static final Store I = Store._(); Store._();
   List<Product> products = []; List<Order> orders = []; Set<String> sent = {};
   Future<void> load() async {
-    final p = await SharedPreferences.getInstance(); final s = p.getString('demo4');
+    final p = await SharedPreferences.getInstance(); final s = p.getString('demo5');
     if (s == null) { seed(); await save(); return; }
     final j = jsonDecode(s); products = (j['products'] as List).map((e) => Product.fromJson(e)).toList(); orders = (j['orders'] as List).map((e) => Order.fromJson(e)).toList(); sent = ((j['sent'] ?? []) as List).cast<String>().toSet();
   }
-  Future<void> save() async => (await SharedPreferences.getInstance()).setString('demo4', jsonEncode({'products': products, 'orders': orders, 'sent': sent.toList()}));
+  Future<void> save() async => (await SharedPreferences.getInstance()).setString('demo5', jsonEncode({'products': products, 'orders': orders, 'sent': sent.toList()}));
   Future<void> reset() async { seed(); await save(); }
   void seed() { sent = {};
     products = [Product(1, 'شمع لیوانی کوچک', 180000), Product(2, 'شمع لیوانی بزرگ', 420000), Product(3, 'شمع گل‌سنگی', 250000), Product(4, 'پک هدیه سه‌تایی', 690000)];
@@ -61,11 +62,11 @@ class Store {
       ['شیوا عباسی', '09131000007', 'قزوین، نوروزیان', 'shiva.abbasi'], ['مهسا اکبری', '09131000008', 'اراک، خ شهید بهشتی', 'mahsa.akbari']];
     const reviews = {10: [5, 'بوی شمع فوق‌العاده بود، بسته‌بندی هم خیلی شیک 🌸'], 11: [4, 'خوب بود، فقط ارسال یک روز دیر رسید'], 12: [2, 'یکی از شمع‌ها ترک داشت و فتیله‌اش کج بود']};
     const spec = [[0, 2, 1, 'delivered', 45], [1, 1, 2, 'delivered', 40], [2, 4, 1, 'delivered', 35], [0, 2, 1, 'shipped', 10], [3, 3, 1, 'paid', 3], [4, 1, 3, 'paid', 2],
-      [3, 2, 2, 'awaiting_confirm', 1], [4, 3, 1, 'awaiting_confirm', 1], [3, 1, 1, 'pending_payment', 2], [4, 4, 1, 'pending_payment', 0], [1, 2, 1, 'delivered', 50], [2, 3, 1, 'delivered', 55], [4, 1, 2, 'delivered', 20], [5, 3, 1, 'shipped', 7], [6, 1, 2, 'shipped', 2], [5, 2, 1, 'delivered', 1], [6, 4, 1, 'delivered', 3]];
+      [3, 2, 2, 'awaiting_confirm', 1], [4, 3, 1, 'awaiting_confirm', 1], [3, 1, 1, 'pending_payment', 2], [4, 4, 1, 'pending_payment', 0], [1, 2, 1, 'delivered', 50], [2, 3, 1, 'delivered', 55], [4, 1, 2, 'delivered', 20], [5, 3, 1, 'shipped', 7], [6, 1, 2, 'shipped', 2], [5, 2, 1, 'delivered', 1], [6, 4, 1, 'delivered', 3], [1, 1, 1, 'cancelled_by_customer', 1]];
     const unseenIdx = {11, 12, 15, 16}; const reviews2 = {15: [5, 'خیلی قشنگ بود، ممنون 🙏']};
     orders = [for (var i = 0; i < spec.length; i++) () { final s = spec[i]; final cu = c[s[0] as int]; final p = products[(s[1] as int) - 1]; final st = s[3] as String;
       final rv = reviews[i] ?? reviews2[i];
-      return Order(id: i + 1, code: 'NR${1000 + i}', name: cu[0], mobile: cu[1], address: cu[2], instagram: cu[3], rating: rv == null ? 0 : rv[0] as int, comment: rv == null ? '' : rv[1] as String, status: st, payRef: st == 'pending_payment' ? '' : '${4000 + i * 7}',
+      return Order(id: i + 1, code: 'NR${1000 + i}', name: cu[0], mobile: cu[1], address: cu[2], instagram: cu[3], rating: rv == null ? 0 : rv[0] as int, comment: rv == null ? '' : rv[1] as String, status: st, payRef: st == 'pending_payment' || st == 'cancelled_by_customer' ? '' : '${4000 + i * 7}',
         hasReceipt: st == 'awaiting_confirm', postalCode: st == 'shipped' || st == 'delivered' ? '1234567890$i' : '', createdAt: DateTime.now().subtract(Duration(days: s[4] as int)), seen: !unseenIdx.contains(i), items: [Item(p.name, p.price, s[2] as int)]); }()];
     // ~50 older archived orders (completed / cancelled) to demo archive grouping + pagination.
     const cm = ['عالی بود 🌸', 'رایحه‌اش محشره', 'بسته‌بندی خیلی خوب بود', 'دیر رسید ولی خوب بود', 'سایزش از عکس کوچیک‌تر بود'];
@@ -77,7 +78,7 @@ class Store {
   }
   List<CustomerStat> customers() {
     final m = <String, List<Order>>{};
-    for (final o in orders.where((o) => o.status != 'cancelled')) { m.putIfAbsent(o.mobile, () => []).add(o); }
+    for (final o in orders.where((o) => !o.cancelled)) { m.putIfAbsent(o.mobile, () => []).add(o); }
     return m.values.map((os) { os.sort((a, b) => b.createdAt.compareTo(a.createdAt)); final l = os.first;
       return CustomerStat(l.name, l.mobile, l.address, os.map((o) => o.instagram).firstWhere((x) => x.isNotEmpty, orElse: () => ''), os.length, os.fold(0, (s, o) => s + o.total), l.createdAt, l.items); }).toList()..sort((a, b) => b.count.compareTo(a.count));
   }

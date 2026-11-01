@@ -32,6 +32,9 @@ const routes = [
     if (o.status !== 'pending_payment') throw 'این سفارش قبلاً پرداخت شده'; if (b.method === 'card' && !b.ref) throw 'شماره پیگیری یا ۴ رقم آخر کارت را وارد کنید';
     const r = payments[b.method](o); o.payment = { method: b.method, ref: b.ref || r.ref, receipt: b.receipt, at: new Date().toISOString() };
     o.status = r.status; o.history.push({ status: r.status, at: o.payment.at }); return o; }],
+  [/^\/api\/public\/orders\/(\w+)\/cancel$/, (d, [c]) => { const o = d.orders.find(x => x.code === c); if (!o) throw 'سفارش پیدا نشد';
+    if (o.status !== 'pending_payment' || o.payment) throw 'برای این سفارش واریز ثبت شده؛ برای لغو به فروشنده پیام بدهید'; o.status = 'cancelled_by_customer'; o.history.push({ status: 'cancelled_by_customer', at: new Date().toISOString() });
+    localStorage.setItem(MINE, JSON.stringify(myOrders().filter(x => x !== c))); return o; }],
   [/^\/api\/public\/orders\/(\w+)\/delivered$/, (d, [c]) => { const o = d.orders.find(x => x.code === c); if (!o) throw 'سفارش پیدا نشد';
     if (o.status !== 'shipped') throw 'این سفارش هنوز ارسال نشده'; o.status = 'delivered'; o.history.push({ status: 'delivered', at: new Date().toISOString() }); return o; }],
   [/^\/api\/public\/orders\/(\w+)\/review$/, (d, [c], b) => { const o = d.orders.find(x => x.code === c); if (!o) throw 'سفارش پیدا نشد';
@@ -61,3 +64,10 @@ async function api(url, opt = {}) {
   for (const [re, fn] of routes) { const m = url.match(re); if (m) { try { const r = fn(d, m.slice(1), opt.body || {}); save(d); return JSON.parse(JSON.stringify(r)); } catch (e) { throw new Error(e.message || e); } } }
   throw new Error('not found');
 }
+// Confirm dialog for customer cancel (Kaka-style sheet)
+function confirmCancel(onYes) { const w = document.createElement('div'); w.className = 'modal-bg';
+  w.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><div style="font-weight:800;font-size:17px;margin-bottom:6px">مطمئنی؟ این سفارش لغو می‌شه</div><div class="muted" style="margin-bottom:16px">سفارشی که هنوز پرداخت نشده بسته می‌شود و دیگر قابل پرداخت نیست. اگر بعداً خواستی، می‌توانی سفارش تازه ثبت کنی.</div>
+   <div style="display:grid;gap:8px"><button class="danger" id="cx-yes">بله، لغو کن</button><button class="ghost" id="cx-no">نه، برمی‌گردم</button></div></div>`;
+  document.body.appendChild(w); const close = () => w.remove(); w.onclick = e => { if (e.target === w) close(); };
+  w.querySelector('#cx-no').onclick = close; w.querySelector('#cx-yes').onclick = () => { close(); onYes(); }; }
+async function cancelOrder(c) { return api(`/api/public/orders/${c}/cancel`, { method: 'POST' }); }

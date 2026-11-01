@@ -61,7 +61,7 @@ class StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    final col = switch (status) { 'shipped' || 'paid' || 'delivered' => c.positive, 'cancelled' => c.negative, 'awaiting_confirm' => c.text, _ => c.textMuted };
+    final col = switch (status) { 'shipped' || 'paid' || 'delivered' => c.positive, 'cancelled' || 'cancelled_by_customer' => c.negative, 'awaiting_confirm' => c.text, _ => c.textMuted };
     return Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(color: col.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(20), border: Border.all(color: col.withValues(alpha: 0.25))),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -307,8 +307,7 @@ class OrderCard extends StatelessWidget {
 class ArchivePage extends StatefulWidget { const ArchivePage({super.key}); @override State<ArchivePage> createState() => _ArchiveState(); }
 class _ArchiveState extends State<ArchivePage> {
   final shown = [20, 20];
-  Widget tab(int t) { final c = AppColors.of(context); final st = t == 0 ? 'delivered' : 'cancelled';
-    final all = Store.I.orders.where((o) => o.status == st).toList()..sort((a, b) {
+  Widget tab(int t) { final c = AppColors.of(context); final all = Store.I.orders.where((o) => t == 0 ? o.status == 'delivered' : o.cancelled).toList()..sort((a, b) {
       if (a.unseen != b.unseen) return a.unseen ? -1 : 1; return b.createdAt.compareTo(a.createdAt); });
     final unseen = all.where((o) => o.unseen).toList(); final rest = all.where((o) => !o.unseen).toList();
     final page = rest.take(shown[t]).toList();
@@ -325,7 +324,7 @@ class _ArchiveState extends State<ArchivePage> {
   Widget card(Order o) => Padding(padding: const EdgeInsets.only(bottom: 10), child: OrderCard(o, onTap: () async { await openOrder(context, o); setState(() {}); }));
   @override
   Widget build(BuildContext context) { final u = Store.I.orders.where((o) => o.unseen).length;
-    final done = Store.I.orders.where((o) => o.status == 'delivered').length, canc = Store.I.orders.where((o) => o.status == 'cancelled').length;
+    final done = Store.I.orders.where((o) => o.status == 'delivered').length, canc = Store.I.orders.where((o) => o.cancelled).length;
     return DefaultTabController(length: 2, child: Scaffold(appBar: AppBar(title: const Text('بایگانی'), bottom: TabBar(tabs: [
       Tab(text: 'تکمیل‌شده ${fa(done)}${u > 0 ? ' – ${fa(u)} جدید' : ''}'), Tab(text: 'لغوشده ${fa(canc)}')])),
       body: TabBarView(children: [tab(0), tab(1)])));
@@ -416,7 +415,7 @@ class _OrderState extends State<OrderPage> {
       const SizedBox(height: 10),
       OutlinedButton.icon(icon: const Icon(Icons.link_rounded), onPressed: () => copy(context, 'سلام ${o.name} عزیز، وضعیت سفارشت رو اینجا ببین: ${storeLink.replaceFirst('order.html?s=noora', 'track.html?c=${o.code}')}'), label: const Text('کپی لینک پیگیری برای مشتری')),
       const SectionTitle('تغییر دستی وضعیت'),
-      Wrap(spacing: 8, runSpacing: 8, children: [for (final s in statusLabels.keys) ChoiceChip(showCheckmark: false, label: Text(statusLabels[s]!), selected: o.status == s, onSelected: (_) => set(s))]),
+      Wrap(spacing: 8, runSpacing: 8, children: [for (final s in statusLabels.keys.where((k) => k != 'cancelled_by_customer')) ChoiceChip(showCheckmark: false, label: Text(statusLabels[s]!), selected: o.status == s, onSelected: (_) => set(s))]),
     ]));
   }
 }
@@ -455,7 +454,7 @@ class _CustomerState extends State<CustomerPage> {
   @override
   Widget build(BuildContext context) { final c = AppColors.of(context);
     final os = Store.I.orders.where((o) => o.mobile == widget.mobile).toList()..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    final l = os.first; final valid = os.where((o) => o.status != 'cancelled').toList();
+    final l = os.first; final valid = os.where((o) => !o.cancelled).toList();
     final spent = valid.fold(0, (s, o) => s + o.total);
     final qty = <String, int>{}; for (final o in valid) { for (final i in o.items) { qty[i.name] = (qty[i.name] ?? 0) + i.qty; } }
     final top = qty.isEmpty ? '—' : (qty.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).first.key;
