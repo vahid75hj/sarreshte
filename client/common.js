@@ -21,10 +21,9 @@ const db = () => JSON.parse(localStorage.getItem(KEY) || 'null') || (save(seed()
 function save(d) { localStorage.setItem(KEY, JSON.stringify(d)); }
 const normMobile = m => String(m || '').replace(/[۰-۹]/g, d => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\D/g, '').replace(/^98/, '0');
 const faDate = iso => new Date(iso).toLocaleString('fa-IR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-// Pluggable payment providers: card = manual card-to-card; mock = DEMO gateway; zarinpal = placeholder.
+// Pluggable payment providers: card = manual card-to-card; zarinpal = placeholder.
 const payments = {
   card: () => ({ status: 'awaiting_confirm' }),
-  mock: () => ({ status: 'paid', ref: 'MOCK-' + Date.now() }),
   zarinpal: () => { throw new Error('زرین‌پال در نسخه دمو فعال نیست'); },
 };
 const routes = [

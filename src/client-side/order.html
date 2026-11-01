@@ -20,7 +20,6 @@
  <div class="card"><label for="ref">شماره پیگیری واریز یا ۴ رقم آخر کارت</label><input id="ref" inputmode="numeric">
   <label>عکس رسید (اختیاری)</label><label class="file"><input type="file" id="receipt" accept="image/*"><span>📎</span><span id="fname">انتخاب عکس رسید</span></label>
   <p id="err2" class="err"></p><div style="margin-top:16px"><button id="paid">واریز کردم</button></div>
-  <div class="or">یا</div><button class="ghost" id="mock">پرداخت با درگاه آزمایشی <span class="badge">فقط دمو</span></button>
   <button class="cancel-link" id="cancel">انصراف از خرید</button></div>
 </section>
 <section id="step3" style="display:none"><div class="card" style="text-align:center"><div style="font-size:34px">✕</div><div style="font-weight:800;font-size:18px;margin:6px 0">سفارش <span id="code3"></span> لغو شد</div><div class="muted" style="margin-bottom:14px">پرداختی انجام نشده بود و چیزی از حسابت کم نشده. هر وقت خواستی، می‌تونی دوباره سفارش بدی.</div><button class="ghost" id="again">ثبت سفارش جدید</button></div></section>
@@ -74,5 +73,5 @@ async function pay(method) { $('#err2').textContent = '';
 function showCancelled() { $('#resume').innerHTML = ''; $('#step1').style.display = 'none'; $('#step2').style.display = 'none'; $('#step3').style.display = 'block'; $('#code3').textContent = order.code; scrollTo(0, 0); }
 $('#cancel').onclick = () => confirmCancel(async () => { try { await cancelOrder(order.code); showCancelled(); } catch (e) { $('#err2').textContent = e.message; } });
 $('#again').onclick = () => { location.href = 'order.html?s=' + slug + (_t ? '&theme=' + _t : ''); };
-$('#paid').onclick = () => pay('card'); $('#mock').onclick = () => pay('mock');
+$('#paid').onclick = () => pay('card');
 </script></main></body></html>

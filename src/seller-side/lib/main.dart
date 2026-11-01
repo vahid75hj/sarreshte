@@ -190,7 +190,7 @@ class OrdersPage extends StatefulWidget { final VoidCallback onChange; const Ord
 class _OrdersState extends State<OrdersPage> {
   static const groups = ['awaiting_confirm', 'pending_payment', 'paid', 'shipped'];
   static const gl = ['منتظر تأیید واریز', 'منتظر واریز', 'پرداخت‌شده', 'ارسال‌شده'];
-  int g = 0; final q = TextEditingController(); DateTimeRange? range; String rangeLabel = '';
+  late int g = Store.I.orders.any((o) => o.shipLate) ? 2 : 0; final q = TextEditingController(); DateTimeRange? range; String rangeLabel = '';
   Future<void> pickRange() async {
     final now = DateTime.now(); final today = DateTime(now.year, now.month, now.day);
     final v = await showModalBottomSheet<int>(context: context, showDragHandle: true, builder: (bc) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -218,6 +218,9 @@ class _OrdersState extends State<OrdersPage> {
     final paidList = os.where((o) => o.status == 'paid').toList(); final paidSum = paidList.fold(0, (s, o) => s + o.total);
     final results = searching ? os.where((o) => o.matches(q.text) && inRange(o)).toList() : <Order>[];
     final list = os.where((o) => o.status == groups[g]).toList();
+    // Open orders: oldest first, so a forgotten one can't sink to the bottom.
+    if (g < 3) list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    final lateN = os.where((o) => o.shipLate).length;
     return ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 100), children: [
       Row(children: [
         Expanded(child: TextField(controller: q, onChanged: (_) => setState(() {}), decoration: InputDecoration(isDense: true, prefixIcon: const Icon(Icons.search_rounded),
@@ -249,6 +252,8 @@ class _OrdersState extends State<OrdersPage> {
         SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [for (var i = 0; i < 4; i++) Padding(padding: const EdgeInsetsDirectional.only(end: 8),
           child: ChoiceChip(showCheckmark: false, selected: g == i, onSelected: (_) => setState(() => g = i), label: Row(mainAxisSize: MainAxisSize.min, children: [
             Text('${gl[i]} ${fa(n(i))}'),
+            if (i == 2 && lateN > 0) ...[const SizedBox(width: 6), Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1), decoration: BoxDecoration(color: c.negative, borderRadius: BorderRadius.circular(10)),
+              child: Text(fa(lateN), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)))],
             if (i == 3 && follow > 0) ...[const SizedBox(width: 6), Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1), decoration: BoxDecoration(color: c.negative, borderRadius: BorderRadius.circular(10)),
               child: Text(fa(follow), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)))]])))])),
         const SizedBox(height: 12),
@@ -258,6 +263,7 @@ class _OrdersState extends State<OrdersPage> {
               Text('${fa(paidList.length)} سفارش', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800))])),
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [Text('مبلغ کل', style: TextStyle(color: c.textMuted, fontSize: 12)), const SizedBox(height: 2),
               Text(toman(paidSum), style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: c.positive))])])),
+        if (g == 2 && lateN > 0) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text('${fa(lateN)} سفارش بیش از ${fa(shipLateDays)} روز است پولش آمده و هنوز ارسال نشده. قدیمی‌ترین‌ها بالا هستند.', style: TextStyle(color: c.negative, fontSize: 13, height: 1.7, fontWeight: FontWeight.w600))),
         if (g == 3 && follow > 0) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text('${fa(follow)} سفارش بیش از ${fa(deliveryFollowUpDays)} روز است ارسال شده و مشتری هنوز «به دستم رسید» را نزده. پیام بده یا خودت تکمیلش کن.', style: TextStyle(color: c.textMuted, fontSize: 13, height: 1.7))),
         if (list.isEmpty) Padding(padding: const EdgeInsets.all(40), child: Center(child: Text('سفارشی در این وضعیت نیست', style: TextStyle(color: c.textMuted)))),
         for (final o in list) Padding(padding: const EdgeInsets.only(bottom: 10), child: OrderCard(o, onTap: () => open(o))),
@@ -272,6 +278,7 @@ class OrderCard extends StatelessWidget {
   Widget build(BuildContext context) { final c = AppColors.of(context);
     final tags = <Widget>[
       if (o.unseen && o.rating > 0) tag('نظر جدید', c.negative, icon: Icons.star_rounded),
+      if (o.shipLate) tag('ارسال عقب افتاده – ${ago(o.createdAt)}', c.negative, icon: Icons.schedule_rounded),
       if (o.followUp) tag('پیگیری تحویل – ${ago(o.createdAt)}', c.negative, icon: Icons.local_shipping_outlined),
       if (o.payReminder) tag('یادآوری پرداخت – ${ago(o.createdAt)}', c.negative),
       if (o.archived && o.rating > 0 && !o.unseen) tag('${fa(o.rating)}★', o.privateReview ? c.negative : c.positive),
@@ -361,7 +368,7 @@ class _OrderState extends State<OrderPage> {
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(o.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 2), Text(fa(int.parse(o.mobile)).replaceAll(',', '').padLeft(11, '۰'), style: TextStyle(color: c.textMuted)),
+          const SizedBox(height: 2), Text(o.mobile.isEmpty ? '—' : faDigits(o.mobile), textDirection: TextDirection.ltr, style: TextStyle(color: c.textMuted)),
           const SizedBox(height: 6), Text(o.address, style: TextStyle(color: c.text, height: 1.6)),
           if (o.instagram.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: InkWell(onTap: () => openIg(context, o.instagram),
             child: Text('اینستاگرام: @${o.instagram}', textDirection: TextDirection.ltr, style: TextStyle(color: c.text, fontWeight: FontWeight.w600)))),
@@ -565,20 +572,31 @@ class _ProductsState extends State<ProductsPage> {
 class DmPage extends StatefulWidget { const DmPage({super.key}); @override State<DmPage> createState() => _DmState(); }
 class _DmState extends State<DmPage> {
   final t = TextEditingController(text: 'سلام ۲ تا شمع لیوانی بزرگ میخوام\nاسمم: لیلا صادقی\nآدرس: تبریز، ولیعصر، کوچه ۳\n۰۹۳۵۱۲۳۴۵۶۷'); Order? d;
+  final name = TextEditingController(), mobile = TextEditingController(), address = TextEditingController();
+  void extract() { final o = Store.I.parseDm(t.text); name.text = o.name; mobile.text = o.mobile; address.text = o.address; setState(() => d = o); }
+  bool get mobileOk => RegExp(r'^09\d{9}$').hasMatch(toEn(mobile.text).trim());
+  void submit() { final o = d!; o.name = name.text.trim(); o.mobile = toEn(mobile.text).trim(); o.address = address.text.trim(); Store.I.add(o); Navigator.pop(context); }
   @override
   Widget build(BuildContext context) { final c = AppColors.of(context);
     Widget kv(String k, String v) => Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       SizedBox(width: 64, child: Text(k, style: TextStyle(color: c.textMuted))), Expanded(child: Text(v.isEmpty ? '—' : v, style: const TextStyle(fontWeight: FontWeight.w600)))]));
+    Widget field(TextEditingController ctl, String label, {bool ltr = false, String? err, int lines = 1}) => Padding(padding: const EdgeInsets.only(bottom: 12), child: TextField(controller: ctl, maxLines: lines,
+      onChanged: (_) => setState(() {}), textDirection: ltr ? TextDirection.ltr : null, keyboardType: ltr ? TextInputType.phone : null, decoration: InputDecoration(labelText: label, errorText: err)));
+    final ok = d != null && d!.items.isNotEmpty && mobileOk && name.text.trim().isNotEmpty;
     return Scaffold(appBar: AppBar(title: const Text('دایرکت ← سفارش')), body: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 32), children: [
       Text('متن دایرکت مشتری را بچسبان تا یک سفارش پیش‌نویس ساخته شود.', style: TextStyle(color: c.textMuted)),
+      const SizedBox(height: 4),
+      Text('در این دمو استخراج با قاعده‌ی ساده انجام می‌شود؛ در نسخه‌ی واقعی این کار با هوش مصنوعی است و فروشنده فقط پیش‌نویس را تأیید می‌کند.', style: TextStyle(color: c.textFaint, fontSize: 12, height: 1.7)),
       const SizedBox(height: 12),
       TextField(controller: t, maxLines: 6, decoration: const InputDecoration(hintText: 'متن دایرکت')),
-      const SizedBox(height: 12), FilledButton(onPressed: () => setState(() => d = Store.I.parseDm(t.text)), child: const Text('استخراج سفارش')),
+      const SizedBox(height: 12), FilledButton(onPressed: extract, child: const Text('استخراج سفارش')),
       if (d != null) ...[const SectionTitle('پیش‌نویس — قبل از ثبت چک کن'), Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        kv('نام', d!.name), kv('موبایل', d!.mobile), kv('آدرس', d!.address),
-        kv('اقلام', d!.items.map((i) => '${fa(i.qty)} × ${i.name}').join('\n')), Divider(color: c.line), kv('جمع', toman(d!.total)),
+        field(name, 'نام', err: name.text.trim().isEmpty ? 'نام لازم است' : null),
+        field(mobile, 'موبایل', ltr: true, err: mobileOk ? null : 'موبایل لازم است (مثل 09121234567)'),
+        field(address, 'آدرس', lines: 2),
+        kv('اقلام', d!.items.isEmpty ? 'محصولی پیدا نشد؛ متن را اصلاح کن' : d!.items.map((i) => '${fa(i.qty)} × ${i.name}').join('\n')), Divider(color: c.line), kv('جمع', toman(d!.total)),
         const SizedBox(height: 12),
-        FilledButton(onPressed: d!.items.isEmpty ? null : () { Store.I.add(d!); Navigator.pop(context); }, child: const Text('ثبت سفارش'))])))],
+        FilledButton(onPressed: ok ? submit : null, child: const Text('ثبت سفارش'))])))],
     ]));
   }
 }

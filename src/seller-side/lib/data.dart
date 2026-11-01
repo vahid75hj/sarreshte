@@ -7,6 +7,8 @@ const storeName = 'شمع نورا';
 const demoPin = '1234';
 /// Shipped orders older than this with no customer action get «پیگیری تحویل».
 const deliveryFollowUpDays = 5;
+/// Paid orders older than this and not shipped yet get «ارسال عقب افتاده».
+const shipLateDays = 2;
 const shopAccount = 'noora@sarreshte.app';
 const shopInstagram = 'noora.candle';
 
@@ -26,6 +28,7 @@ class Order { int id; String code, name, mobile, address, note, status, payRef, 
   bool get archived => status == 'delivered' || cancelled;
   bool get unseen => status == 'delivered' && !seen;
   bool get followUp => status == 'shipped' && DateTime.now().difference(createdAt).inDays >= deliveryFollowUpDays;
+  bool get shipLate => status == 'paid' && DateTime.now().difference(createdAt).inDays >= shipLateDays;
   bool get payReminder => status == 'pending_payment' && DateTime.now().difference(createdAt).inHours >= 24;
   bool matches(String q) { final t = toEn(q).trim().toLowerCase().replaceAll('@', ''); if (t.isEmpty) return true;
     return code.toLowerCase().contains(t) || name.contains(q.trim()) || mobile.contains(t) || instagram.toLowerCase().contains(t); }
@@ -100,4 +103,5 @@ class Store {
 }
 String toEn(String s) => s.replaceAllMapped(RegExp('[۰-۹]'), (m) => '${'۰۱۲۳۴۵۶۷۸۹'.indexOf(m[0]!)}');
 String fa(num n) { final s = n.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => ','); return s.replaceAllMapped(RegExp(r'\d'), (m) => '۰۱۲۳۴۵۶۷۸۹'[int.parse(m[0]!)]); }
+String faDigits(String s) => s.replaceAllMapped(RegExp(r'\d'), (m) => '۰۱۲۳۴۵۶۷۸۹'[int.parse(m[0]!)]);
 String toman(num n) => '${fa(n)} تومان';
